@@ -32,6 +32,7 @@ Thumbs.db
 Docs/*
 !Docs/CODEBASE_GUIDE.md
 !Docs/AudioPlayback.md
+!Docs/SpatialSandboxDemo.md
 
 # Release output and Python caches
 dist/

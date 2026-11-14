@@ -1,9 +1,10 @@
 // Copyright (c) 2026 SpatialFabric Contributors. Licensed under the MIT License.
 
-// Listens on a UDP port; OnOscMessageReceivedNative → HandleOSCMessage → broadcast.
+// Exact-bind UDP receive; bounded game-thread polling → HandleOSCMessage → broadcast.
 
 #include "SpatialOSCServerComponent.h"
 #include "SpatialFabricSettings.h"
+#include "SpatialFabricOSCReceiver.h"
 #include "OSCManager.h"
 #include "OSCAddress.h"
 #include "OSCTypes.h"
@@ -16,8 +17,7 @@ DEFINE_LOG_CATEGORY_STATIC(LogSpatialOSCServer, Log, All);
 
 USpatialOSCServerComponent::USpatialOSCServerComponent()
 {
-	// Incoming OSC is callback-driven (OnOscMessageReceivedNative), not polled in Tick
-	PrimaryComponentTick.bCanEverTick = false;
+	PrimaryComponentTick.bCanEverTick = false; // Receiver dispatch uses the core ticker, including paused worlds.
 }
 
 void USpatialOSCServerComponent::BeginPlay()
@@ -31,42 +31,48 @@ void USpatialOSCServerComponent::EndPlay(const EEndPlayReason::Type EndPlayReaso
 	Super::EndPlay(EndPlayReason);
 }
 
+void USpatialOSCServerComponent::OnUnregister()
+{
+	StopListening(); // Editor deletion/map reload must not wait for UObject garbage collection.
+	Super::OnUnregister();
+}
+
+void USpatialOSCServerComponent::BeginDestroy()
+{
+	StopListening();
+	Super::BeginDestroy();
+}
+
 void USpatialOSCServerComponent::StartListening(const FString& IP, int32 Port)
 {
 	StopListening();
 
-	// bStartListening=true starts receive immediately; other flags are UE OSC defaults
-	OSCServer = UOSCManager::CreateOSCServer(IP, Port, false, true, GetName(), this);
-
-	if (!OSCServer || !OSCServer->IsActive())
+	Receiver = MakeShared<FSpatialFabricOSCReceiver>();
+	if (Port <= 0 || !Receiver->Start(IP, Port))
 	{
-		UE_LOG(LogSpatialOSCServer, Error, TEXT("Failed to create OSC Server on %s:%d"), *IP, Port);
+		Receiver.Reset();
+		UE_LOG(LogSpatialOSCServer, Error, TEXT("Failed to bind OSC Server on %s:%d"), *IP, Port);
 		return;
 	}
 
-	OSCServer->OnOscMessageReceivedNative.AddUObject(this, &USpatialOSCServerComponent::HandleOSCMessage);
-
-	CurrentIP = IP;
-	CurrentPort = Port;
+	CurrentIP = Receiver->GetIP();
+	CurrentPort = Receiver->GetPort();
+	Receiver->SetDispatcher([Owner = TWeakObjectPtr<USpatialOSCServerComponent>(this)](const FOSCMessage& Message, const FString& SenderIP, uint16 SenderPort)
+	{ if (Owner.IsValid()) Owner->HandleOSCMessage(Message, SenderIP, SenderPort); });
 	SF_LOG_DEBUG(TEXT("OSC Server listening on %s:%d"), *IP, Port);
 }
 
 void USpatialOSCServerComponent::StopListening()
 {
-	if (OSCServer)
-	{
-		OSCServer->Stop();
-		OSCServer->OnOscMessageReceivedNative.RemoveAll(this);
-		OSCServer = nullptr;
-		CurrentPort = 0;
-		CurrentIP.Empty();
-		SF_LOG_DEBUG(TEXT("OSC Server stopped"));
-	}
+	if (Receiver) Receiver->Stop();
+	Receiver.Reset();
+	CurrentPort = 0;
+	CurrentIP.Empty();
 }
 
 bool USpatialOSCServerComponent::IsListening() const
 {
-	return OSCServer && OSCServer->IsActive();
+	return Receiver && Receiver->IsListening();
 }
 
 void USpatialOSCServerComponent::HandleOSCMessage(const FOSCMessage& Message, const FString& IPAddress, uint16 Port)

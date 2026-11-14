@@ -2,8 +2,8 @@
 
 /**
  * Stage volume: defines normalization basis. ResolveListenerThisFrame runs every
- * Tick before WorldToNormalized — it updates CachedListenerPos/Rot and may move
- * this actor to follow the listener. Collision is disabled so the box never blocks gameplay.
+ * Tick before WorldToNormalized — it updates a virtual CachedListenerPos/Rot basis
+ * without moving this actor or its descendants. Collision is disabled so the box never blocks gameplay.
  */
 
 #include "SpatialStageVolume.h"
@@ -83,7 +83,7 @@ void ASpatialStageVolume::ResolveListenerThisFrame()
 	bListenerResolved = false;
 	CachedListenerRot = FRotator::ZeroRotator;
 
-	// ── Off: restore design location and use box origin ────────────────────
+	// ── Off: use the authored box origin ──────────────────────────────────
 	if (ListenerMode == EListenerMode::Off)
 	{
 		CachedListenerPos = StageBox->GetComponentLocation();

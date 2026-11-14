@@ -2,12 +2,14 @@
 // Declares the runtime module and its link dependencies (OSC = UE's built-in plugin).
 
 using UnrealBuildTool;
+using System.IO;
 
 public class SpatialFabric : ModuleRules
 {
 	public SpatialFabric(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
+		PrivateIncludePaths.Add(Path.Combine(ModuleDirectory, "..", "Shared"));
 
 		PublicDependencyModuleNames.AddRange(new string[]
 		{

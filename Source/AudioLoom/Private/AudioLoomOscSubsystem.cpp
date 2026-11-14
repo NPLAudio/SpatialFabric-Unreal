@@ -12,7 +12,7 @@
 #include "AudioLoomComponent.h"
 #include "AudioLoomOscSettings.h"
 #include "OSCManager.h"
-#include "OSCServer.h"
+#include "SpatialFabricOSCReceiver.h"
 #include "OSCClient.h"
 #include "OSCMessage.h"
 #include "EngineUtils.h"
@@ -45,7 +45,7 @@ bool UAudioLoomOscSubsystem::IsPortAvailable(int32 Port)
 
 	TSharedRef<FInternetAddr> Addr = SocketSubsystem->CreateInternetAddr();
 	bool bValid = false;
-	Addr->SetIp(TEXT("0.0.0.0"), bValid); // bind all interfaces — same as server will use
+	Addr->SetIp(TEXT("0.0.0.0"), bValid); // Conservative UI probe; actual StartListening binds the configured IP directly.
 	Addr->SetPort(static_cast<uint16>(Port));
 
 	bool bBound = TestSocket->Bind(*Addr); // if this fails, something else already owns the UDP port
@@ -117,24 +117,19 @@ bool UAudioLoomOscSubsystem::StartListening()
 	const int32 Port = Settings->ListenPort;
 	if (!(GIsEditor ? Settings->bEnableInEditor : Settings->bEnableInPackagedBuilds)) return false;
 
-	if (!IsPortAvailable(Port))
+	Receiver = MakeShared<FSpatialFabricOSCReceiver>();
+	if (Port <= 0 || !Receiver->Start(Settings->ListenIP, Port))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("AudioLoom OSC: Port %d is not available"), Port);
+		Receiver.Reset();
+		UE_LOG(LogTemp, Warning, TEXT("AudioLoom OSC: Failed to bind %s:%d"), *Settings->ListenIP, Port);
 		return false;
 	}
-
-	OSCServer = UOSCManager::CreateOSCServer(Settings->ListenIP, Port, false, true, TEXT("AudioLoom"), this); // UDP, receive enabled
-	if (!OSCServer || !OSCServer->IsActive())
-	{
-		UE_LOG(LogTemp, Error, TEXT("AudioLoom OSC: Failed to create server on port %d"), Port);
-		return false;
-	}
-
-	OSCServer->OnOscMessageReceivedNative.AddUObject(this, &UAudioLoomOscSubsystem::HandleOSCMessage);
 
 	RebuildComponentRegistry();
 
 	UpdateMonitoringTarget();
+	Receiver->SetDispatcher([Owner = TWeakObjectPtr<UAudioLoomOscSubsystem>(this)](const FOSCMessage& Message, const FString& IP, uint16 SenderPort)
+	{ if (Owner.IsValid()) Owner->HandleOSCMessage(Message, IP, SenderPort); });
 
 	UE_LOG(LogTemp, Log, TEXT("AudioLoom OSC: Listening on port %d"), Port);
 	return true;
@@ -142,12 +137,8 @@ bool UAudioLoomOscSubsystem::StartListening()
 
 void UAudioLoomOscSubsystem::StopListening()
 {
-	if (OSCServer)
-	{
-		OSCServer->Stop();
-		OSCServer->OnOscMessageReceivedNative.RemoveAll(this); // don’t call back into a destroyed subsystem
-		OSCServer = nullptr;
-	}
+	if (Receiver) Receiver->Stop();
+	Receiver.Reset();
 	if (OSCClient)
 	{
 		CastChecked<UAudioLoomManagedOSCClient>(OSCClient)->Shutdown();
@@ -157,7 +148,7 @@ void UAudioLoomOscSubsystem::StopListening()
 
 bool UAudioLoomOscSubsystem::IsListening() const
 {
-	return OSCServer && OSCServer->IsActive();
+	return Receiver && Receiver->IsListening();
 }
 
 void UAudioLoomOscSubsystem::UpdateMonitoringTarget()

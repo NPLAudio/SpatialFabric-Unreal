@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "OSCServer.h"
 #include "OSCMessage.h"
 #include "SpatialOSCServerComponent.generated.h"
 
@@ -18,13 +17,13 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnSpatialOSCMessageReceived, const
  * message — enough for simple feedback; extend HandleOSCMessage if you need full
  * multi-arg parsing.
  *
- * Wraps the Unreal Engine OSC plugin's UOSCServer to receive incoming UDP
- * packets and expose them as a Blueprint-assignable delegate.
+ * Uses an exact-bind UDP receiver and Unreal OSC message types. Unlike UE 5.8's
+ * UOSCServer, loopback requests never silently bind to a LAN interface.
  *
  * Only the first float argument of each message is forwarded; multi-argument
  * or non-float messages are silently ignored.
  *
- * Owned by ASpatialFabricManagerActor.  Do not tick — event-driven via OSC callbacks.
+ * Owned by ASpatialFabricManagerActor. Core-ticker receive dispatch is independent of world pause.
  */
 UCLASS(BlueprintType, ClassGroup = "SpatialFabric",
 	meta = (BlueprintSpawnableComponent, DisplayName = "Spatial OSC Server Component"))
@@ -62,17 +61,17 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void OnUnregister() override;
+	virtual void BeginDestroy() override;
 
 private:
-	/** Underlying UE OSC server object. */
-	UPROPERTY()
-	UOSCServer* OSCServer;
+	TSharedPtr<class FSpatialFabricOSCReceiver> Receiver;
 
 	/** IP address the server is bound to. */
 	FString CurrentIP;
 	/** Port the server is listening on. */
 	int32 CurrentPort = 0;
 
-	/** Callback from UOSCServer; extracts the first float and fires OnMessageReceived. */
+	/** Extracts the first numeric argument and fires OnMessageReceived. */
 	void HandleOSCMessage(const FOSCMessage& Message, const FString& IPAddress, uint16 Port);
 };

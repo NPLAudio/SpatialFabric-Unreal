@@ -22,6 +22,10 @@ REQUIRED_TESTS = {
     "SpatialFabric.Playback.TransportReplayCancellation",
     "SpatialFabric.OSC.TypedPlayTriggers",
     "SpatialFabric.OSC.LoopbackAndClientReuse",
+    "SpatialFabric.OSC.ExactBindAndReceive",
+    "SpatialFabric.OSC.CoreTickerLifecycle",
+    "SpatialFabric.OSC.BoundedDatagramDecoder",
+    "SpatialFabric.OSC.ComponentUnregisterClosesSocket",
     "SpatialFabric.CSV.ValidationMultilineAndUndo",
 }
 

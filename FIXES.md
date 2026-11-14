@@ -48,9 +48,30 @@ confined to this plugin; AudioLoom's module/class identities remain compatible.
 - Windows resource/error handling is explicit. macOS callbacks validate float32 layouts,
   pre-zero all output, resample at the stream rate, avoid callback allocation/logging,
   bound buffer capacity, detect stalls, and allow Stop to interrupt the final drain.
-- Version is now 2.0.0. `Docs/AudioPlayback.md` documents changed descendant addresses,
+- Version is now 2.0.1. `Docs/AudioPlayback.md` documents changed descendant addresses,
   virtual listener following, ADM unit-sphere coordinates, cooked Force Inline policy,
   fail-closed device routes, loopback defaults, and independent network permissions.
+
+## 2.0.1 live-demo findings
+
+Live testing in SpatialSandbox found that UE 5.8's stock OSC receiver rewrites
+`127.0.0.1` to a LAN address, while its proxy can report active after a socket bind
+failure. Editor component deletion could also retain its socket until GC.
+
+Both runtime modules now share an exact-bind, bounded game-thread receiver without
+introducing a circular module dependency. It verifies the real socket address,
+fails closed on invalid/occupied endpoints, closes immediately on unregister,
+and rejects malformed/unsupported OSC datagrams atomically. IPv4 unicast input
+supports `i/f/s/b/h/T/F`, immediate bounded bundles, and finite float validation.
+Public class/module/delegate identities remain unchanged. Four new native
+regressions exercise real inbound UDP, decoding/bounds, unregister cleanup, and
+core-ticker callback lifetime. The core ticker keeps control reception independent
+of world pause/realtime viewport ticking; callbacks may safely stop/release a receiver.
+
+The reproducible showcase builder, independent UDP capture and live checks are in
+`Tools/Unreal/`; see `Docs/SpatialSandboxDemo.md`. Sandbox binary assets stay outside
+the plugin Git repository. Existing engine primitives and generated test tones
+were sufficient; no third-party asset downloads were needed.
 
 ## Validation status and limits
 
@@ -60,8 +81,13 @@ macOS/Linux, older Unreal releases, or the full interactive editor workflow. Tho
 are intentionally explicit rather than marked complete based on a successful compile.
 
 Latest native run: **UE 5.8 Win64 Editor, Development, Shipping builds succeeded;
-21 native tests passed, zero failed/skipped**. The Python layout/branding/result-runner
-suite also passes (12 checks). Native evidence is retained locally in the validation
-runner's `SpatialFabricValidation-rgyc3onw` output directory. The production source
-matches that native build; subsequent changes are documentation/branding/task tracking.
-Hardware and packaged-content gates above remain explicitly unverified.
+25 native tests passed, zero failed/skipped**. The Python layout/branding/result-runner/
+demo-tooling suite also passes (14 checks). Native evidence is retained locally in
+`SpatialFabricValidation-5gg8mmdf`. The production source matches that native build.
+
+A live SpatialSandbox run additionally passed 24 PIE checks (including paused-world OSC play/stop) and five post-PIE
+handoff/restoration checks. Independent UDP capture recorded 15,458 messages with
+no decode or XYZ/AED consistency failures; playback state messages reflected actual
+worker start/stop, including natural auto-replay. Local evidence is under
+`SpatialSandbox/Saved/SpatialFabricDemo`. Hardware listening/capture and packaged-
+content gates remain explicitly unverified; these results do not certify latency.

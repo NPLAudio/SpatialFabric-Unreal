@@ -73,6 +73,11 @@ The editor module transfers an active playback listener across editor/PIE transi
 Spatial positioning remains independent: its default loopback listen port is `8100`,
 and ADM output is `50018`. Its permissions are in Spatial Fabric project settings.
 
+**2.0.1** uses an exact-bind receiver rather than UE 5.8's stock loopback-to-LAN
+rewrite. Bind failures are real socket failures, and unregister closes immediately.
+Input is bounded IPv4 unicast OSC (`i/f/s/b/h/T/F`); unsupported or malformed
+messages are rejected. See the [showcase tour and live checks](SpatialSandboxDemo.md).
+
 ## Migration from standalone AudioLoom / SpatialFabric 1.x
 
 1. Close Unreal, back up the project, and remove standalone `Plugins/AudioLoom`

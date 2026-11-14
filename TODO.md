@@ -5,18 +5,20 @@
 - [x] Consolidate AudioLoom runtime/editor modules into SpatialFabric while preserving class/module identity.
 - [x] Move the independent plugin Git repository into `SpatialSandbox/Plugins/SpatialFabric`.
 - [x] Implement audit remediation and promote real regressions into the repository.
-- [x] Validate UE 5.8 Win64 Editor, Development, Shipping; 21 native tests passed.
-- [x] Validate 12 Python layout/branding/result-runner checks.
+- [x] Validate UE 5.8 Win64 Editor, Development, Shipping; 25 native tests passed (`SpatialFabricValidation-5gg8mmdf`).
+- [x] Validate 14 Python layout/branding/result-runner/demo-tooling checks.
+- [x] Fix live-demo discoveries: exact loopback binding, real bind-failure status, bounded OSC decoding, immediate editor unregister cleanup; version 2.0.1.
 
-## In progress — execute in this order
+## Requested follow-up
 
 - [x] Configure Pi for Unreal's existing built-in MCP endpoint and verify it targets SpatialSandbox (`/Game/FirstPerson/Lvl_FirstPerson`).
 - [x] Merge SpatialFabric and AudioLoom branding in documentation and the plugin icon; retain source artwork, attribution, and a reproduction script.
 - [x] Final review of plugin changes, migration guidance, build/test evidence, and generated-file exclusions.
-- [ ] Commit plugin changes to its SpatialFabric Git repository and push to `origin` (NPLAudio/SpatialFabric).
-- [ ] Build a demonstration level in SpatialSandbox covering spatial routing, listener-relative coordinates, direct playback/channel routing, OSC, and management tools.
-- [ ] Import free assets only if useful; record source URLs, license terms, and attribution. Prefer existing project/engine assets where possible.
-- [ ] Exercise the demonstration in Unreal, save the map/assets, and document how to run it and what still needs external audio hardware/software.
+- [x] Commit/push the unified plugin/branding and follow-up receiver/demo tooling to `origin/main` (NPLAudio/SpatialFabric); initial push `5624f34`.
+- [x] Build `/Game/SpatialFabricDemo/Maps/L_SpatialFabric_Showcase`: four spatial objects, listener-relative coordinates, three direct-playback/channel stations, simultaneous ADM/Custom OSC, and management-panel workflow.
+- [x] Use engine/project assets and generated tones; no third-party downloads needed. Record provenance/terms in `Docs/SpatialSandboxDemo.md`.
+- [x] Save the separate sandbox map/assets; publish a reproducible source builder without committing sandbox binary content.
+- [x] Exercise 24 live PIE checks (including paused-world OSC play/stop), five post-PIE restoration checks, and independent UDP capture (15,458 messages; zero decode/XYZ-AED failures). Document operation and remaining external hardware/software gates.
 
 ## Explicit validation gates
 

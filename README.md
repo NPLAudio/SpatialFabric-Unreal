@@ -24,6 +24,7 @@ need real-time spatial audio positioning from Unreal Engine.
 - [Installation](#installation)
 - [Quick Start](#quick-start)
 - [Audio Playback & Migration](#audio-playback--migration)
+- [SpatialSandbox Showcase](#spatialsandbox-showcase)
 - [Coordinate Convention](#coordinate-convention)
 - [Feature Overview](#feature-overview)
 - [Supported Protocols](#supported-protocols)
@@ -45,10 +46,13 @@ need real-time spatial audio positioning from Unreal Engine.
 | UE Plugin | **OSC** (built-in, must be enabled) |
 
 SpatialFabric includes its own `USpatialOSCClientComponent` and
-`USpatialOSCServerComponent` that wrap UE's built-in OSC plugin directly.
-No additional plugins are required beyond OSC. Direct audio playback supports
-**Windows and macOS**; it is separate from spatial positioning and does not
-spatialize PCM through the ADM-OSC output.
+`USpatialOSCServerComponent`, using UE OSC message/client types and an exact-bind
+UDP receiver. **2.0.1** avoids UE 5.8's loopback-to-LAN address rewrite and checks
+real socket binding rather than proxy existence. Receive input is bounded IPv4
+unicast OSC; see [receiver policy](Docs/SpatialSandboxDemo.md#osc-endpoints).
+No additional runtime plugins are required beyond OSC. Direct playback backends
+are implemented for **Windows and macOS** (macOS still requires native validation);
+PCM playback is independent of ADM-OSC positioning.
 
 ---
 
@@ -99,15 +103,15 @@ regenerate project files.
 ### Option C — Build from source
 
 ```batch
-"C:\Program Files\Epic Games\UE_5.7\Engine\Build\BatchFiles\Build.bat" ^
+"C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" ^
     YourProjectEditor Win64 Development ^
     -Project="C:\path\to\YourProject.uproject" -WaitMutex -FromMsBuild
 ```
 
 Adjust the UE path and target name to match your installation.
 
-For UE 5.4 and other 5.x installs, use the matching engine path for that
-version when invoking the build script.
+Other 5.x installs require their own native compatibility/build verification;
+use the matching engine path and do not infer support from the UE 5.8 result.
 
 ### Dependency summary
 
@@ -180,6 +184,19 @@ See [Audio playback setup, limitations, and migration](Docs/AudioPlayback.md) be
 upgrading an existing AudioLoom project. This is a packaging/UI consolidation;
 the safety/routing fixes and validation status are tracked in [FIXES.md](FIXES.md).
 Review the intentional v2 OSC, listener, and cooked-audio migration changes in the guide.
+
+---
+
+## SpatialSandbox Showcase
+
+A generated laboratory level demonstrates animated spatial objects, simultaneous
+ADM/Custom ID routes, virtual listener following, and three manual-start playback
+stations. No third-party asset downloads are required.
+
+Open `/Game/SpatialFabricDemo/Maps/L_SpatialFabric_Showcase` in the local
+SpatialSandbox project. The map is sandbox content, not included in this plugin's
+source ZIP; the reproducible builder is in `Tools/Unreal/`.
+See the [tour, OSC endpoints, provenance and live checks](Docs/SpatialSandboxDemo.md).
 
 ---
 
@@ -401,7 +418,7 @@ Plugins/SpatialFabric/
     │   │   ├── ProtocolRouter.h                 — Fan-out to all adapters
     │   │   ├── SpatialMath.h                    — Coordinate transform utilities
     │   │   ├── SpatialOSCClientComponent.h      — Sends OSC UDP (wraps UE OSC plugin)
-    │   │   ├── SpatialOSCServerComponent.h      — Receives OSC UDP (wraps UE OSC plugin)
+    │   │   ├── SpatialOSCServerComponent.h      — Receives exact-bind OSC UDP
     │   │   └── Adapters/
     │   │       ├── ADMOSCAdapter.h              — ADM-OSC v1.0 (L-ISA, etc.)
     │   │       └── CustomAdapter.h               — Template-based OSC (xyz/aed, bundled/discrete)
@@ -443,7 +460,7 @@ Plugins/SpatialFabric/
 | `FProtocolRouter` | Fans snapshot to all enabled adapters; filters per-adapter object subsets |
 | `ISpatialProtocolAdapter` | Pure interface all adapters implement; includes rate limiter |
 | `USpatialOSCClientComponent` | Sends outgoing OSC UDP via UE's built-in OSC plugin |
-| `USpatialOSCServerComponent` | Receives incoming OSC UDP via UE's built-in OSC plugin |
+| `USpatialOSCServerComponent` | Receives bounded OSC UDP on the exact configured IPv4 interface |
 
 ### Data Flow
 

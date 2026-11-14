@@ -50,8 +50,10 @@ migration, ports, platform support, and known limitations.
 6. **`SpatialFabricManagerActor`** — wires components, tick, adapters.
 7. **`SpatialMath`** — polar/Cartesian helpers for OSC.
 8. **`Adapters/ADMOSCAdapter`**, **`Adapters/CustomAdapter`** — wire format details.
-9. **`SpatialOSCClientComponent` / `SpatialOSCServerComponent`** — UE OSC plugin wrappers.
-10. **`SpatialFabricEditorModule`** + **`SSpatialFabricPanel`** — editor UI (large file; use section comments).
+9. **`SpatialOSCClientComponent` / `SpatialOSCServerComponent`** — reusable UE OSC clients and exact-bind server polling.
+10. **`Source/Shared/SpatialFabricOSCReceiver.h`** — bounded OSC decoder and socket ownership shared by the independent spatial/playback modules; avoids UE 5.8's loopback-to-LAN rewrite.
+11. **`SpatialFabricEditorModule`** + **`SSpatialFabricPanel`** — editor UI (large file; use section comments).
+12. **`Tools/Unreal/`** — reproducible [SpatialSandbox showcase](SpatialSandboxDemo.md) and live/capture diagnostics, not runtime code.
 
 ## Unreal Engine concepts you’ll see
 
@@ -59,7 +61,7 @@ migration, ports, platform support, and known limitations.
 - **`AActor`** — anything placed in a level (your stage volume, manager, tracked props).
 - **`UActorComponent`** — logic attached to an actor (registry, OSC client/server).
 - **`TSoftObjectPtr`** — reference that may not be loaded; used for picking actors in the editor.
-- **Game thread** — all of this runs on the game thread; adapters are not thread-safe for background use.
+- **Game thread** — spatial routing/UDP receive dispatch run here; adapters are not thread-safe for background use. PCM device output uses its separate worker/callback backend.
 
 ## Where settings live
 

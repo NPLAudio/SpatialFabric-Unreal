@@ -10,6 +10,7 @@ public class AudioLoom : ModuleRules
 	public AudioLoom(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
+		PrivateIncludePaths.Add(Path.Combine(ModuleDirectory, "..", "Shared"));
 
 		// Modules whose public headers this module includes from its own public headers
 		PublicDependencyModuleNames.AddRange(new string[]

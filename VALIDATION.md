@@ -22,6 +22,9 @@ This builds the plugin for **Editor, Development, and Shipping**, creates a temp
 project outside the plugin, loads the built plugin, runs all `SpatialFabric*` native
 regressions with NullRHI/NoSound, and checks the JSON report for failures, skipped tests,
 or an empty test suite. It never opens or saves SpatialSandbox's level/config files.
+Latest UE 5.8 Win64 evidence: `SpatialFabricValidation-5gg8mmdf`, **25 tests passed**,
+zero failed/skipped; Editor/Development/Shipping builds passed. Fast Python checks:
+**14 passed**.
 Logs, the built plugin, and the test report remain in the printed temporary directory.
 Use `--editor-only` for iteration, or `--output` with a new empty directory to retain
 named evidence. Output directories inside the source plugin are rejected.
@@ -45,7 +48,23 @@ The repository tests invoke production code for:
 - Actual ADM metadata/coordinates, coherent XYZ/AED radius, Custom token validation,
   discrete axis/value pairing, and packet changes when send flags/custom fields change.
 - Descendant OSC address separation, explicit Stop tick cancellation, typed play triggers.
+- Real inbound loopback UDP on the exact configured interface, occupied-endpoint failure,
+  immediate unregister cleanup, atomic malformed-bundle rejection, depth/blob bounds,
+  finite floats, strict padding/truncation handling, and actual core-ticker dispatch
+  with safe stop/owner release inside a callback (no component/world tick dependency).
 - CSV multiline/quoted round-trip, invalid number/quote rejection, and actual import undo.
+
+## SpatialSandbox integration evidence
+
+The [showcase guide](Docs/SpatialSandboxDemo.md) documents repeatable live editor/PIE
+checks and an independent packet capture, separate from the headless suite. The
+observed run passed **24 live checks**, including OSC play/stop while paused, and **five post-PIE restoration checks**;
+15,458 captured messages had no decode or XYZ/AED consistency failures. Spatial
+objects animated, actual playback worker states changed, replay cancellation and
+missing-device failure were exercised, and no authored stage motion occurred.
+Physical listening/capture, latency, the full editor workflow matrix, and packaged
+codec playback remain unverified. Evidence stays in the sandbox's
+`Saved/SpatialFabricDemo/` directory and is not plugin Git content.
 
 ## Required manual/integration gates before a show release
 

@@ -125,9 +125,8 @@ public:
 
 	/**
 	 * Shared OSC client — passed to all OSC-based adapters for sending.
-	 * NOTE: All OSC adapters share one client; each adapter sends to its own
-	 * configured IP:port by reconnecting the client per-send.  For independent
-	 * concurrent targets, create multiple manager actors.
+	 * The component reuses managed clients per endpoint, so adapters can send to
+	 * independent configured IP:port targets without creating a socket per frame.
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SpatialFabric|Components")
 	USpatialOSCClientComponent* ClientComponent;

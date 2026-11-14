@@ -17,7 +17,6 @@
 #include "AudioLoomOscSubsystem.generated.h"
 
 class UAudioLoomComponent;
-class UOSCServer;
 class UOSCClient;
 struct FOSCMessage;
 
@@ -45,7 +44,7 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "AudioLoom|OSC")
 	bool IsListening() const;
 
-	/** Try to bind to the given port. Returns true if port is available. */
+	/** Conservative all-interface UI probe. StartListening's exact configured-IP bind is authoritative. */
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "AudioLoom|OSC")
 	static bool IsPortAvailable(int32 Port);
 
@@ -67,11 +66,10 @@ public:
 	virtual void Deinitialize() override;
 
 private:
-	/** Bound to `OSCServer`; parses address and dispatches to components (game thread). */
+	/** Exact-bind receiver dispatches validated messages here on the game thread. */
 	void HandleOSCMessage(const FOSCMessage& Message, const FString& IPAddress, uint16 Port);
 
-	UPROPERTY()
-	UOSCServer* OSCServer; // UDP listener (incoming triggers)
+	TSharedPtr<class FSpatialFabricOSCReceiver> Receiver; // Exact-bind, game-thread UDP listener
 
 	UPROPERTY()
 	UOSCClient* OSCClient; // UDP sender (outgoing /state); recreated when Send IP/Port changes
