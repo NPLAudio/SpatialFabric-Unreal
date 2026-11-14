@@ -28,6 +28,9 @@ Saved/
 .DS_Store
 Thumbs.db
 
+# Office temporary lock files
+~$*.pptx
+
 # Docs/ — retain public guides; ignore local working notes
 Docs/*
 !Docs/CODEBASE_GUIDE.md

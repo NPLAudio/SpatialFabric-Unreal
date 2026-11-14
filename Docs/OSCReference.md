@@ -2,6 +2,13 @@
 
 [Documentation index](README.md) · [Spatial conventions](SpatialRouting.md)
 
+## Standalone controller
+
+The independent [OSC Controller desktop app](../Apps/OSCController/README.md) provides
+cue Play/Stop/Loop, worker-state monitoring, direct ADM renderer controls and a typed
+message composer. It runs without Unreal and never auto-sends on startup. Its spatial
+pad controls a renderer directly; it does not remotely move Unreal actors.
+
 ## Ports: inputs and destinations are different
 
 | Path | Default IP:port | Direction relative to Unreal |

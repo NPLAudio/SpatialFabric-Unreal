@@ -74,6 +74,7 @@ jobs:
             --exclude='DerivedDataCache' \
             --exclude='Examples' \
             --exclude='Presentations' \
+            --exclude='Apps' \
             --exclude='.pi' \
             --exclude='*.pdb' \
             --exclude='.DS_Store' \

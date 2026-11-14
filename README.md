@@ -27,6 +27,7 @@ Stage, Objects, Radar, Output and Playback.
 | Add the plugin to a show/project | [Getting started](Docs/GettingStarted.md) |
 | Send positions to an external renderer | [Spatial routing](Docs/SpatialRouting.md) |
 | Play cues to a device/channel | [Audio playback and CSV](Docs/AudioPlayback.md) |
+| Use a standalone OSC desktop controller | [OSC Controller app](Apps/OSCController/README.md) |
 | Connect a controller or inspect packets | [OSC reference](Docs/OSCReference.md) |
 | Find out why something is silent/invisible | [Troubleshooting](Docs/Troubleshooting.md) |
 | Build, test or extend the code | [Development](Docs/Development.md) and [codebase guide](Docs/CODEBASE_GUIDE.md) |
@@ -51,7 +52,7 @@ Native Editor/Development/Shipping compilation does **not** certify physical aud
 channels, exclusive mode, latency, all interfaces, or cooked codec playback.
 See [remaining release gates](VALIDATION.md).
 
-The plugin-only release ZIP intentionally omits the example and deck. Use the
+The plugin-only release ZIP intentionally omits the example, deck and standalone apps. Use the
 complete GitHub repository for those files, or the companion example ZIP when a
 release provides it. Release automation is configured to attach the example/deck;
 a push to main alone does not create a release or version tag.
