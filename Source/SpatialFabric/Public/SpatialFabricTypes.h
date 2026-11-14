@@ -86,6 +86,14 @@ struct SPATIALFABRIC_API FSpatialNormalizedState
 {
 	GENERATED_BODY()
 
+	/** Source binding index; never inferred from the compacted snapshot position. */
+	UPROPERTY(BlueprintReadOnly, Category = "SpatialFabric")
+	int32 BindingIndex = INDEX_NONE;
+
+	/** Separate protocol name, so display/custom labels are not overwritten. */
+	UPROPERTY(BlueprintReadOnly, Category = "SpatialFabric")
+	FString ADMName;
+
 	UPROPERTY(BlueprintReadOnly, Category = "SpatialFabric")
 	FGuid SpatialGuid;
 
@@ -241,7 +249,7 @@ struct SPATIALFABRIC_API FSpatialAdapterConfig
 		meta = (ClampMin = "1024", ClampMax = "65535"))
 	int32 TargetPort = 50018;
 
-	/** Maximum packets per second sent by this adapter (rate limiting). */
+	/** Maximum update batches per second (each batch can contain many OSC packets). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "SpatialFabric|Adapter",
 		meta = (ClampMin = "1.0", ClampMax = "120.0"))
 	float SendRateHz = 50.f;

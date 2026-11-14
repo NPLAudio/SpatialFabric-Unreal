@@ -32,6 +32,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Validate combined plugin layout
+        run: python3 -m unittest discover -s Tools -p 'test_*.py'
+
       - name: Determine version
         id: version
         env:
@@ -59,6 +62,9 @@ jobs:
           rsync -a \
             --exclude='.git' \
             --exclude='.github' \
+            --exclude='dist' \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
             --exclude='.gitignore' \
             --exclude='.claude' \
             --exclude='docs' \
@@ -82,13 +88,17 @@ jobs:
           body: |
             ## SpatialFabric ${{ steps.version.outputs.name }}
 
-            Multi-protocol spatial audio show-control plugin for Unreal Engine.
+            Source-only release: compile against your Unreal Engine installation.
+            Run Native Unreal validation on a provisioned host before production deployment.
+            Spatial audio control and direct device/channel playback for Unreal Engine.
+            Includes AudioLoom playback and CSV routing in the SpatialFabric Playback tab.
 
             ### Installation
 
             1. Download the zip file
             2. Extract and copy the `SpatialFabric` folder into your project's `Plugins` directory
-            3. Restart Unreal Editor
+            3. When upgrading AudioLoom, remove the standalone AudioLoom plugin and its .uproject entry first
+            4. Regenerate project files/rebuild as needed, then restart Unreal Editor
 
             ### Requirements
 

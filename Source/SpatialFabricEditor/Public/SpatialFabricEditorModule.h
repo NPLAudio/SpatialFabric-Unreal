@@ -38,4 +38,6 @@ private:
 	TSharedPtr<class FTabManager::FLayout> TabLayout;
 
 	FDelegateHandle PIEStartedHandle;
+	FDelegateHandle PostPIEHandle;
+	FDelegateHandle EndPIEHandle;
 };

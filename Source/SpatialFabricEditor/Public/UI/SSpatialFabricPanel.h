@@ -23,13 +23,14 @@ class ASpatialStageVolume;
  * SCompoundWidget is Unreal's immediate-mode UI (Slate), not UMG. Construct() builds
  * the widget tree; timers refresh lists and the radar from the manager actor.
  *
- * Dockable Slate editor panel for SpatialFabric.  Four tabs:
+ * Dockable Slate editor panel for SpatialFabric. Five tabs:
  *
  *  [Stage]    — Stage Volume setup and listener assignment.
  *  [Objects]  — Spatial object binding list with Add Selected Actors,
  *               per-binding ID editing, adapter badge toggles, and remove.
  *  [Radar]    — Live 2D top-down view of tracked objects with coordinates.
  *  [Output]   — Live preview of protocol output (state table + message log).
+ *  [Playback] — AudioLoom device/channel playback, CSV routing, and OSC transport.
  */
 class SSpatialFabricPanel : public SCompoundWidget
 {

@@ -6,6 +6,7 @@
  */
 
 #include "SpatialOSCClientComponent.h"
+#include "SpatialManagedOSCClient.h"
 #include "SpatialFabricSettings.h"
 #include "OSCManager.h"
 #include "OSCMessage.h"
@@ -32,10 +33,16 @@ void USpatialOSCClientComponent::EndPlay(const EEndPlayReason::Type EndPlayReaso
 
 void USpatialOSCClientComponent::Connect(const FString& IP, int32 Port)
 {
-	Disconnect(); // Drop old socket before rebinding (adapters retarget IP:port often)
-
-	// Outer = this component so the UOSCClient lifetime ties to the owning actor
-	OSCClient = UOSCManager::CreateOSCClient(IP, Port, GetName(), this);
+	if (Port < 1 || Port > 65535 || IP.IsEmpty()) { Disconnect(); return; }
+	if (OSCClient && OSCClient->IsActive())
+	{
+		if (OSCClient->SetSendIPAddress(IP, Port)) { CurrentIP = IP; CurrentPort = Port; return; }
+		Disconnect();
+		return;
+	}
+	Disconnect();
+	OSCClient = NewObject<USpatialManagedOSCClient>(this);
+	OSCClient->Connect();
 
 	if (!OSCClient)
 	{
@@ -43,6 +50,7 @@ void USpatialOSCClientComponent::Connect(const FString& IP, int32 Port)
 		return;
 	}
 
+	if (!OSCClient->SetSendIPAddress(IP, Port)) { Disconnect(); return; }
 	if (!OSCClient->IsActive())
 	{
 		UE_LOG(LogSpatialOSCClient, Warning,
@@ -61,6 +69,7 @@ void USpatialOSCClientComponent::Disconnect()
 	if (OSCClient)
 	{
 		// UOSCClient is GC'd when no strong refs remain
+		CastChecked<USpatialManagedOSCClient>(OSCClient)->Shutdown();
 		OSCClient = nullptr;
 		CurrentIP.Empty();
 		CurrentPort = 0;

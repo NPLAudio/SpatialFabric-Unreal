@@ -30,8 +30,8 @@ enum class EListenerMode : uint8
  *
  * The box's *half-extent* (UBoxComponent) in Unreal units (cm) defines how far from
  * center you reach ±1 normalized coordinates. WorldToNormalized divides local offset
- * by half-extent per axis, then clamps. Listener modes move the actor so "center"
- * follows the player when configured.
+ * by half-extent per axis, then clamps. Listener modes follow a virtual basis and
+ * never move the authored actor (which could be an ancestor of the listener).
  *
  * A box-shaped level actor that defines the physical audio coordinate space.
  * All SpatialFabric object positions are normalized relative to this volume:
@@ -39,7 +39,7 @@ enum class EListenerMode : uint8
  * maps to (1,0,0), etc.  Objects outside the volume are clamped to ±1.
  *
  * The box component's extent (half-size) in UE units determines the coordinate
- * space.  PhysicalWidth/Depth/HeightMeters tell adapters the real-world scale
+ * space. PhysicalWidth/Depth/HeightMeters tell adapters the real-world scale
  * for absolute-position output (e.g. DS100 absolute mode).
  *
  * Set ListenerMode to follow the player camera or an assigned actor, enabling

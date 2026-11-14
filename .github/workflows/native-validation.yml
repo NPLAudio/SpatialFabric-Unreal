@@ -1,0 +1,32 @@
+name: Native Unreal validation
+
+# Unreal is licensed software and is not installed on GitHub-hosted runners.
+# Run only on a trusted, provisioned host; never execute untrusted PRs on it.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  win64:
+    runs-on: [self-hosted, Windows, Unreal]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Structural and validation-runner tests
+        run: python -m unittest discover -s Tools -p "test_*.py"
+      - name: Build Editor, Development, Shipping and run native regressions
+        shell: pwsh
+        run: |
+          if (-not $env:UNREAL_ENGINE_ROOT) { throw 'Set UNREAL_ENGINE_ROOT on the Unreal runner.' }
+          python Tools/validate_unreal.py --output "${{ runner.temp }}/SpatialFabric-${{ github.run_id }}-${{ github.run_attempt }}"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Upload build and native test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SpatialFabric-Win64-validation
+          path: |
+            ${{ runner.temp }}/SpatialFabric-${{ github.run_id }}-${{ github.run_attempt }}/*.log
+            ${{ runner.temp }}/SpatialFabric-${{ github.run_id }}-${{ github.run_attempt }}/Report/**

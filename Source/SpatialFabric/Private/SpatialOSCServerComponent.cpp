@@ -38,7 +38,7 @@ void USpatialOSCServerComponent::StartListening(const FString& IP, int32 Port)
 	// bStartListening=true starts receive immediately; other flags are UE OSC defaults
 	OSCServer = UOSCManager::CreateOSCServer(IP, Port, false, true, GetName(), this);
 
-	if (!OSCServer)
+	if (!OSCServer || !OSCServer->IsActive())
 	{
 		UE_LOG(LogSpatialOSCServer, Error, TEXT("Failed to create OSC Server on %s:%d"), *IP, Port);
 		return;
@@ -66,7 +66,7 @@ void USpatialOSCServerComponent::StopListening()
 
 bool USpatialOSCServerComponent::IsListening() const
 {
-	return OSCServer != nullptr;
+	return OSCServer && OSCServer->IsActive();
 }
 
 void USpatialOSCServerComponent::HandleOSCMessage(const FOSCMessage& Message, const FString& IPAddress, uint16 Port)

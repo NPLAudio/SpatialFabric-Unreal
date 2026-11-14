@@ -15,6 +15,8 @@
 #include "SpatialOSCServerComponent.h"
 #include "SpatialOSCClientComponent.h"
 #include "EngineUtils.h"
+#include "Engine/Engine.h"
+#include "UObject/Package.h"
 
 // Adapters
 #include "Adapters/ADMOSCAdapter.h"
@@ -49,9 +51,7 @@ void ASpatialFabricManagerActor::BeginPlay()
 	}
 	ApplyStageVisibility();
 
-	const USpatialFabricSettings* Settings = GetDefault<USpatialFabricSettings>();
-	const bool bIsPackaged = !GIsEditor;
-	if (bIsPackaged && !Settings->bEnableInPackagedBuilds)
+	if (!IsNetworkingAllowed())
 	{
 		// Skip OSC entirely in shipping unless explicitly opted in (avoids surprise UDP)
 		UE_LOG(LogTemp, Warning,
@@ -62,7 +62,7 @@ void ASpatialFabricManagerActor::BeginPlay()
 	// Wire incoming OSC to router
 	if (ServerComponent)
 	{
-		ServerComponent->OnMessageReceived.AddDynamic(this,
+		ServerComponent->OnMessageReceived.AddUniqueDynamic(this,
 			&ASpatialFabricManagerActor::OnOSCMessageReceived);
 	}
 
@@ -87,16 +87,6 @@ void ASpatialFabricManagerActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// Re-resolve stage volume each tick (handles late binding + PIE world mismatch)
-	if (!IsValid(ResolvedStageVolume) && !StageVolume.IsNull())
-	{
-		ResolvedStageVolume = ResolveStageVolumeForThisWorld();
-		if (IsValid(ResolvedStageVolume))
-		{
-			AddTickPrerequisiteActor(ResolvedStageVolume);
-		}
-	}
-
 	ProcessFrame(DeltaTime);
 }
 
@@ -104,12 +94,24 @@ void ASpatialFabricManagerActor::Tick(float DeltaTime)
 
 void ASpatialFabricManagerActor::ProcessFrame(float DeltaTime)
 {
-	if (!Router) { return; }
-
-	// Single pipeline step: registry produces geometry; router + adapters produce OSC
-	LastSnapshot =
-		RegistryComponent->BuildSnapshot(ObjectBindings, ResolvedStageVolume);
-
+	ASpatialStageVolume* Stage = ResolveStageVolumeForThisWorld();
+	if (Stage != ResolvedStageVolume)
+	{
+		if (IsValid(ResolvedStageVolume)) RemoveTickPrerequisiteActor(ResolvedStageVolume);
+		ResolvedStageVolume = Stage;
+		if (IsValid(Stage)) AddTickPrerequisiteActor(Stage);
+		ApplyStageVisibility();
+	}
+	if (IsValid(Stage)) Stage->ResolveListenerThisFrame();
+	LastSnapshot = RegistryComponent->BuildSnapshot(ObjectBindings, Stage);
+	if (!IsNetworkingAllowed()) { ShutdownNetworking(); return; }
+	if (!Router)
+	{
+		Router = MakeUnique<FProtocolRouter>();
+		ServerComponent->OnMessageReceived.AddUniqueDynamic(this, &ASpatialFabricManagerActor::OnOSCMessageReceived);
+		StartServer();
+		InitializeAdapters();
+	}
 	Router->ProcessFrame(LastSnapshot, ObjectBindings, DeltaTime);
 }
 
@@ -117,10 +119,10 @@ void ASpatialFabricManagerActor::ProcessFrame(float DeltaTime)
 
 void ASpatialFabricManagerActor::StartServer()
 {
-	if (ServerComponent)
+	if (ServerComponent && IsNetworkingAllowed())
 	{
 		const USpatialFabricSettings* S = GetDefault<USpatialFabricSettings>();
-		ServerComponent->StartListening(TEXT("0.0.0.0"), S->DefaultOSCListenPort);
+		ServerComponent->StartListening(S->DefaultOSCListenIP, S->DefaultOSCListenPort);
 	}
 }
 
@@ -131,7 +133,7 @@ void ASpatialFabricManagerActor::StopServer()
 
 void ASpatialFabricManagerActor::ConnectClient()
 {
-	if (ClientComponent)
+	if (ClientComponent && IsNetworkingAllowed())
 	{
 		// Default outbound target: ADM-OSC config (other adapters reconnect in ProcessFrame)
 		const uint8 ADMKey = (uint8)ESpatialAdapterType::ADMOSC;
@@ -165,7 +167,9 @@ void ASpatialFabricManagerActor::AppendLog(const FSpatialFabricLogEntry& Entry)
 
 TArray<FSpatialFabricLogEntry> ASpatialFabricManagerActor::GetRecentLog(int32 Count) const
 {
-	const int32 Start = FMath::Max(0, MessageLog.Num() - Count);
+	Count = FMath::Clamp(Count, 0, MessageLog.Num());
+	if (Count == 0) return {};
+	const int32 Start = MessageLog.Num() - Count;
 	return TArray<FSpatialFabricLogEntry>(MessageLog.GetData() + Start,
 	                                     MessageLog.Num() - Start);
 }
@@ -185,7 +189,9 @@ ASpatialFabricManagerActor* ASpatialFabricManagerActor::GetOrSpawnManager(
 		return *It; // reuse existing manager
 	}
 
-	return World->SpawnActor<ASpatialFabricManagerActor>();
+	FActorSpawnParameters Params;
+	Params.ObjectFlags |= RF_Transactional;
+	return World->SpawnActor<ASpatialFabricManagerActor>(Params);
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────
@@ -254,14 +260,17 @@ void ASpatialFabricManagerActor::OnOSCMessageReceived(const FString& Address, fl
 void ASpatialFabricManagerActor::SendCustomOSC(const FString& Address,
 	const TArray<float>& FloatArgs, const TArray<int32>& IntArgs, const TArray<FString>& StringArgs)
 {
-	if (!ClientComponent) { return; }
+	if (!ClientComponent || !IsNetworkingAllowed()) { return; }
+	const FSpatialOSCMessage Packet{Address, FloatArgs, IntArgs, StringArgs};
+	if (!Packet.IsValid()) { UE_LOG(LogTemp, Warning, TEXT("SpatialFabric: invalid Custom OSC message")); return; }
 
 	// One UDP client is shared: temporarily point it at CustomTarget*, send, then restore
 	FString PrevIP = ClientComponent->GetTargetIP();
 	int32 PrevPort = ClientComponent->GetTargetPort();
 
 	ClientComponent->Connect(CustomTargetIP, CustomTargetPort);
-	ClientComponent->SendMessage(Address, FloatArgs, IntArgs, StringArgs);
+	const bool bCanSend = ClientComponent->IsConnected();
+	if (bCanSend) ClientComponent->SendMessage(Address, FloatArgs, IntArgs, StringArgs);
 
 	// Restore previous connection
 	if (!PrevIP.IsEmpty() && PrevPort > 0)
@@ -282,7 +291,8 @@ void ASpatialFabricManagerActor::SendCustomOSC(const FString& Address,
 		}
 	}
 
-	// Log the send
+	if (!bCanSend) return;
+	// Log the accepted socket send (UDP delivery itself is not acknowledged).
 	FSpatialFabricLogEntry Entry;
 	Entry.Adapter = TEXT("Custom");
 	Entry.Direction = TEXT("OUT");
@@ -306,14 +316,26 @@ ASpatialStageVolume* ASpatialFabricManagerActor::ResolveStageVolumeForThisWorld(
 	{
 		SV = nullptr; // Wrong world — don't use
 	}
+	if (!SV && GetWorld() && GetWorld()->WorldType == EWorldType::PIE)
+	{
+		FSoftObjectPath Path = StageVolume.ToSoftObjectPath();
+		Path.FixupForPIE(GetWorld()->GetOutermost()->GetPIEInstanceID());
+		SV = Cast<ASpatialStageVolume>(Path.ResolveObject());
+		if (SV && SV->GetWorld() != GetWorld()) SV = nullptr;
+	}
 	if (!SV && GetWorld())
 	{
-		// Fallback: find an ASpatialStageVolume in this world (handles PIE duplication)
+		// Match an assigned stage by object name in this world; never silently
+		// substitute another stage. Empty assignment means manager fallback space.
+		const FString Path = StageVolume.ToSoftObjectPath().GetSubPathString();
+		FString Leaf;
+		Path.Split(TEXT("."), nullptr, &Leaf, ESearchCase::CaseSensitive, ESearchDir::FromEnd);
+		int32 Matches = 0;
 		for (TActorIterator<ASpatialStageVolume> It(GetWorld()); It; ++It)
 		{
-			SV = *It;
-			break;
+			if (!Leaf.IsEmpty() && It->GetName() == Leaf) { SV = *It; ++Matches; }
 		}
+		if (Matches != 1) SV = nullptr;
 	}
 	return SV;
 }
@@ -338,3 +360,52 @@ void ASpatialFabricManagerActor::ApplyStageVisibility()
 		}
 	}
 }
+
+FString ASpatialFabricManagerActor::BuildOutputPreview() const
+{
+	FProtocolRouter Preview;
+	for (ESpatialAdapterType Type : {ESpatialAdapterType::ADMOSC, ESpatialAdapterType::Custom})
+	{
+		const auto* Config = AdapterConfigs.Find((uint8)Type);
+		if (!Config) continue;
+		TSharedPtr<ISpatialProtocolAdapter> Adapter;
+		if (Type == ESpatialAdapterType::ADMOSC) Adapter = MakeShared<FADMOSCAdapter>();
+		else Adapter = MakeShared<FCustomAdapter>();
+		Adapter->Configure(*Config);
+		Preview.RegisterAdapter(Adapter);
+	}
+	return Preview.BuildPreview(LastSnapshot, ObjectBindings);
+}
+
+bool ASpatialFabricManagerActor::IsNetworkingAllowed() const
+{
+	const auto* Settings = GetDefault<USpatialFabricSettings>();
+	return GIsEditor ? Settings->bEnableInEditor : Settings->bEnableInPackagedBuilds;
+}
+
+void ASpatialFabricManagerActor::ShutdownNetworking()
+{
+	StopServer();
+	DisconnectClient();
+	Router.Reset();
+}
+
+void ASpatialFabricManagerActor::BeginDestroy()
+{
+	ShutdownNetworking();
+	Super::BeginDestroy();
+}
+
+#if WITH_EDITOR
+void ASpatialFabricManagerActor::PostEditUndo()
+{
+	Super::PostEditUndo();
+	if (Router) InitializeAdapters();
+}
+
+void ASpatialFabricManagerActor::PostEditChangeProperty(FPropertyChangedEvent& Event)
+{
+	Super::PostEditChangeProperty(Event);
+	if (Router) InitializeAdapters();
+}
+#endif

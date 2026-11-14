@@ -11,6 +11,7 @@
  */
 
 #include "UI/SSpatialFabricPanel.h"
+#include "UI/SAudioLoomPanel.h"
 #include "SpatialFabricManagerActor.h"
 #include "SpatialFabricSettings.h"
 #include "SpatialStageVolume.h"
@@ -19,7 +20,19 @@
 #include "SpatialMath.h"
 
 #include "Editor.h"
+#include "ScopedTransaction.h"
+
+namespace
+{
+struct FScopedSpatialEdit
+{
+	FScopedTransaction Transaction;
+	explicit FScopedSpatialEdit(UObject* Object) : Transaction(NSLOCTEXT("SpatialFabric", "Edit", "Edit Spatial Fabric")) { if (Object) Object->Modify(); }
+};
+}
+
 #include "EngineUtils.h"
+#include "Engine/Level.h"
 #include "Selection.h"
 
 #include "Widgets/Layout/SBorder.h"
@@ -333,7 +346,8 @@ void SSpatialFabricPanel::Construct(const FArguments& InArgs)
 		+ SWidgetSwitcher::Slot()[ BuildStageTab()   ]   // 0
 		+ SWidgetSwitcher::Slot()[ BuildObjectsTab() ]   // 1
 		+ SWidgetSwitcher::Slot()[ BuildRadarTab()   ]   // 2
-		+ SWidgetSwitcher::Slot()[ BuildOutputTab()  ];  // 3
+		+ SWidgetSwitcher::Slot()[ BuildOutputTab()  ]   // 3
+		+ SWidgetSwitcher::Slot()[ SNew(SAudioLoomPanel) ]; // 4: direct audio playback
 
 	// ── Tab button row ──────────────────────────────────────────────────────
 	auto MakeTabBtn = [this](FText Label, int32 Idx) -> TSharedRef<SWidget>
@@ -381,7 +395,7 @@ void SSpatialFabricPanel::Construct(const FArguments& InArgs)
 			.Padding(2.f, 2.f, 2.f, 6.f)
 			[
 				SNew(STextBlock)
-				.Text(LOCTEXT("Title", "Spatial Fabric — Multi-Protocol Spatial Control"))
+				.Text(LOCTEXT("Title", "Spatial Fabric — Spatial Control & Audio Playback"))
 				.Font(FAppStyle::GetFontStyle("BoldFont"))
 				.ColorAndOpacity(FLinearColor(0.85f, 0.85f, 0.85f))
 			]
@@ -393,7 +407,9 @@ void SSpatialFabricPanel::Construct(const FArguments& InArgs)
 				SNew(SBorder)
 				.Visibility_Lambda([this]()
 				{
-					return GetManager() ? EVisibility::Collapsed : EVisibility::Visible;
+					// Direct playback does not require a spatial manager actor.
+					return GetManager() || TabSwitcher->GetActiveWidgetIndex() == 4
+						? EVisibility::Collapsed : EVisibility::Visible;
 				})
 				.BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
 				.BorderBackgroundColor(FLinearColor(0.38f, 0.22f, 0.08f))
@@ -437,6 +453,8 @@ void SSpatialFabricPanel::Construct(const FArguments& InArgs)
 				[ MakeTabBtn(LOCTEXT("TabRadar",  "Radar"),  2) ]
 				+ SHorizontalBox::Slot().AutoWidth().Padding(0.f, 0.f, 2.f, 0.f)
 				[ MakeTabBtn(LOCTEXT("TabOutput", "Output"), 3) ]
+				+ SHorizontalBox::Slot().AutoWidth().Padding(0.f, 0.f, 2.f, 0.f)
+				[ MakeTabBtn(LOCTEXT("TabPlayback", "Playback"), 4) ]
 				+ SHorizontalBox::Slot().FillWidth(1.f) // spacer
 			]
 
@@ -521,7 +539,10 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildStageTab()
 					}
 					if (!SV)
 					{
-						SV = W->SpawnActor<ASpatialStageVolume>();
+						const FScopedTransaction Transaction(LOCTEXT("SpawnStageTransaction", "Spawn Spatial Stage"));
+						W->GetCurrentLevel()->Modify();
+						FActorSpawnParameters Params; Params.ObjectFlags |= RF_Transactional;
+						SV = W->SpawnActor<ASpatialStageVolume>(Params);
 					}
 					if (!SV) return FReply::Handled();
 
@@ -530,7 +551,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildStageTab()
 					{
 						if (Mgr->StageVolume.Get() != SV)
 						{
-							Mgr->StageVolume = SV;
+							FScopedSpatialEdit Edit(Mgr); Mgr->StageVolume = SV;
 							Mgr->MarkPackageDirty();
 						}
 					}
@@ -617,7 +638,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildStageTab()
 										if (!PickedSV) { return; }
 										if (ASpatialFabricManagerActor* Mgr = GetManager())
 										{
-											Mgr->StageVolume = PickedSV;
+											FScopedSpatialEdit Edit(Mgr); Mgr->StageVolume = PickedSV;
 											Mgr->MarkPackageDirty();
 										}
 									})));
@@ -656,7 +677,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildStageTab()
 					.OnClicked_Lambda([GetSV]() -> FReply
 					{
 						if (ASpatialStageVolume* SV = GetSV())
-						{ SV->ListenerMode = EListenerMode::Off; SV->MarkPackageDirty(); }
+						{ FScopedSpatialEdit Edit(SV); SV->ListenerMode = EListenerMode::Off; SV->MarkPackageDirty(); }
 						return FReply::Handled();
 					})
 					.ToolTipText(LOCTEXT("ListenerOffTip",
@@ -679,7 +700,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildStageTab()
 					.OnClicked_Lambda([GetSV]() -> FReply
 					{
 						if (ASpatialStageVolume* SV = GetSV())
-						{ SV->ListenerMode = EListenerMode::FollowPositionAndOrientation; SV->MarkPackageDirty(); }
+						{ FScopedSpatialEdit Edit(SV); SV->ListenerMode = EListenerMode::FollowPositionAndOrientation; SV->MarkPackageDirty(); }
 						return FReply::Handled();
 					})
 					.ToolTipText(LOCTEXT("ListenerPosRotTip",
@@ -703,7 +724,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildStageTab()
 				{
 					if (ASpatialFabricManagerActor* Mgr = GetManager())
 					{
-						Mgr->bHideStageInPIE = (NewState == ECheckBoxState::Checked);
+						FScopedSpatialEdit Edit(Mgr); Mgr->bHideStageInPIE = (NewState == ECheckBoxState::Checked);
 						Mgr->MarkPackageDirty();
 						Mgr->ApplyStageVisibility();
 					}
@@ -819,7 +840,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildObjectsTab()
 							if (FSpatialAdapterConfig* C = Mgr->AdapterConfigs.Find((uint8)Mgr->ActiveAdapterType))
 							{
 								const FString NewIP = Val.ToString().TrimStartAndEnd();
-								C->TargetIP = NewIP.IsEmpty() ? TEXT("127.0.0.1") : NewIP;
+								FScopedSpatialEdit Edit(Mgr); C->TargetIP = NewIP.IsEmpty() ? TEXT("127.0.0.1") : NewIP;
 								Mgr->MarkPackageDirty();
 								if (Mgr->GetRouter()) Mgr->InitializeAdapters();
 								// Persist to project settings so new managers and levels use this IP
@@ -865,7 +886,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildObjectsTab()
 		if (ASpatialFabricManagerActor* Mgr = GetManager())
 			if (FSpatialAdapterConfig* C = Mgr->AdapterConfigs.Find((uint8)Mgr->ActiveAdapterType))
 			{
-				C->TargetPort = FMath::Clamp(Val, 1024, 65535);
+				FScopedSpatialEdit Edit(Mgr); C->TargetPort = FMath::Clamp(Val, 1024, 65535);
 				Mgr->MarkPackageDirty();
 				if (Mgr->GetRouter()) Mgr->InitializeAdapters();
 				// Persist to project settings so new managers use this port
@@ -988,7 +1009,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildObjectsTab()
 		if (ASpatialFabricManagerActor* Mgr = GetManager())
 			if (FSpatialAdapterConfig* C = Mgr->AdapterConfigs.Find((uint8)Mgr->ActiveAdapterType))
 			{
-				C->SendRateHz = FMath::Clamp(Val, 1.f, 120.f);
+				FScopedSpatialEdit Edit(Mgr); C->SendRateHz = FMath::Clamp(Val, 1.f, 120.f);
 				Mgr->MarkPackageDirty();
 				if (Mgr->GetRouter()) Mgr->InitializeAdapters();
 			}
@@ -1065,7 +1086,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildObjectsTab()
 					if (ASpatialFabricManagerActor* Mgr = GetManager())
 						if (FSpatialAdapterConfig* C = Mgr->AdapterConfigs.Find((uint8)Mgr->ActiveAdapterType))
 						{
-							C->bSendOnlyOnChange = (NewState == ECheckBoxState::Checked);
+							FScopedSpatialEdit Edit(Mgr); C->bSendOnlyOnChange = (NewState == ECheckBoxState::Checked);
 							Mgr->MarkPackageDirty();
 							if (Mgr->GetRouter()) Mgr->InitializeAdapters();
 						}
@@ -1138,7 +1159,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildObjectsTab()
 						if (ASpatialFabricManagerActor* Mgr = GetManager())
 							if (FSpatialAdapterConfig* C = Mgr->AdapterConfigs.Find((uint8)Mgr->ActiveAdapterType))
 							{
-								C->bEnabled = true;
+								FScopedSpatialEdit Edit(Mgr); C->bEnabled = true;
 								Mgr->MarkPackageDirty();
 								if (Mgr->GetRouter()) Mgr->InitializeAdapters();
 							}
@@ -1234,7 +1255,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildObjectsTab()
 								if (ASpatialFabricManagerActor* M = GetManager())
 									if (FSpatialAdapterConfig* C = M->AdapterConfigs.Find((uint8)ESpatialAdapterType::Custom))
 									{
-										C->CustomCoordinateMode = ECustomCoordinateMode::XYZ;
+										FScopedSpatialEdit Edit(M); C->CustomCoordinateMode = ECustomCoordinateMode::XYZ;
 										M->MarkPackageDirty();
 										if (M->GetRouter()) M->InitializeAdapters();
 									}
@@ -1262,7 +1283,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildObjectsTab()
 								if (ASpatialFabricManagerActor* M = GetManager())
 									if (FSpatialAdapterConfig* C = M->AdapterConfigs.Find((uint8)ESpatialAdapterType::Custom))
 									{
-										C->CustomCoordinateMode = ECustomCoordinateMode::AED;
+										FScopedSpatialEdit Edit(M); C->CustomCoordinateMode = ECustomCoordinateMode::AED;
 										M->MarkPackageDirty();
 										if (M->GetRouter()) M->InitializeAdapters();
 									}
@@ -1298,7 +1319,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildObjectsTab()
 								if (ASpatialFabricManagerActor* M = GetManager())
 									if (FSpatialAdapterConfig* C = M->AdapterConfigs.Find((uint8)ESpatialAdapterType::Custom))
 									{
-										C->CustomSendMode = ECustomSendMode::Bundled;
+										FScopedSpatialEdit Edit(M); C->CustomSendMode = ECustomSendMode::Bundled;
 										M->MarkPackageDirty();
 										if (M->GetRouter()) M->InitializeAdapters();
 									}
@@ -1326,7 +1347,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildObjectsTab()
 								if (ASpatialFabricManagerActor* M = GetManager())
 									if (FSpatialAdapterConfig* C = M->AdapterConfigs.Find((uint8)ESpatialAdapterType::Custom))
 									{
-										C->CustomSendMode = ECustomSendMode::Discrete;
+										FScopedSpatialEdit Edit(M); C->CustomSendMode = ECustomSendMode::Discrete;
 										M->MarkPackageDirty();
 										if (M->GetRouter()) M->InitializeAdapters();
 									}
@@ -1369,7 +1390,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildObjectsTab()
 							if (ASpatialFabricManagerActor* M = GetManager())
 								if (FSpatialAdapterConfig* C = M->AdapterConfigs.Find((uint8)ESpatialAdapterType::Custom))
 								{
-									C->CustomAddressTemplate = Val.ToString();
+									FScopedSpatialEdit Edit(M); C->CustomAddressTemplate = Val.ToString();
 									M->MarkPackageDirty();
 									if (M->GetRouter()) M->InitializeAdapters();
 								}
@@ -1404,7 +1425,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildObjectsTab()
 								if (ASpatialFabricManagerActor* M = GetManager())
 									if (FSpatialAdapterConfig* C = M->AdapterConfigs.Find((uint8)ESpatialAdapterType::Custom))
 									{
-										C->CustomArgTemplate = Val.ToString();
+										FScopedSpatialEdit Edit(M); C->CustomArgTemplate = Val.ToString();
 										M->MarkPackageDirty();
 										if (M->GetRouter()) M->InitializeAdapters();
 									}
@@ -1448,7 +1469,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildObjectsTab()
 								if (ASpatialFabricManagerActor* M = GetManager())
 									if (FSpatialAdapterConfig* C = M->AdapterConfigs.Find((uint8)ESpatialAdapterType::Custom))
 									{
-										C->CustomPositionRange.X = Val;
+										FScopedSpatialEdit Edit(M); C->CustomPositionRange.X = Val;
 										M->MarkPackageDirty();
 										if (M->GetRouter()) M->InitializeAdapters();
 									}
@@ -1475,7 +1496,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildObjectsTab()
 								if (ASpatialFabricManagerActor* M = GetManager())
 									if (FSpatialAdapterConfig* C = M->AdapterConfigs.Find((uint8)ESpatialAdapterType::Custom))
 									{
-										C->CustomPositionRange.Y = Val;
+										FScopedSpatialEdit Edit(M); C->CustomPositionRange.Y = Val;
 										M->MarkPackageDirty();
 										if (M->GetRouter()) M->InitializeAdapters();
 									}
@@ -1502,7 +1523,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildObjectsTab()
 								if (ASpatialFabricManagerActor* M = GetManager())
 									if (FSpatialAdapterConfig* C = M->AdapterConfigs.Find((uint8)ESpatialAdapterType::Custom))
 									{
-										C->CustomGainRange.X = Val;
+										FScopedSpatialEdit Edit(M); C->CustomGainRange.X = Val;
 										M->MarkPackageDirty();
 										if (M->GetRouter()) M->InitializeAdapters();
 									}
@@ -1529,7 +1550,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildObjectsTab()
 								if (ASpatialFabricManagerActor* M = GetManager())
 									if (FSpatialAdapterConfig* C = M->AdapterConfigs.Find((uint8)ESpatialAdapterType::Custom))
 									{
-										C->CustomGainRange.Y = Val;
+										FScopedSpatialEdit Edit(M); C->CustomGainRange.Y = Val;
 										M->MarkPackageDirty();
 										if (M->GetRouter()) M->InitializeAdapters();
 									}
@@ -1556,7 +1577,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildObjectsTab()
 								if (ASpatialFabricManagerActor* M = GetManager())
 									if (FSpatialAdapterConfig* C = M->AdapterConfigs.Find((uint8)ESpatialAdapterType::Custom))
 									{
-										C->CustomWidthRange.X = Val;
+										FScopedSpatialEdit Edit(M); C->CustomWidthRange.X = Val;
 										M->MarkPackageDirty();
 										if (M->GetRouter()) M->InitializeAdapters();
 									}
@@ -1583,7 +1604,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildObjectsTab()
 								if (ASpatialFabricManagerActor* M = GetManager())
 									if (FSpatialAdapterConfig* C = M->AdapterConfigs.Find((uint8)ESpatialAdapterType::Custom))
 									{
-										C->CustomWidthRange.Y = Val;
+										FScopedSpatialEdit Edit(M); C->CustomWidthRange.Y = Val;
 										M->MarkPackageDirty();
 										if (M->GetRouter()) M->InitializeAdapters();
 									}
@@ -1800,7 +1821,7 @@ TSharedRef<ITableRow> SSpatialFabricPanel::GenerateBindingRow(
 								if (ASpatialFabricManagerActor* M = GetManager())
 									if (M->ObjectBindings.IsValidIndex(BIdx))
 									{
-										M->ObjectBindings[BIdx].DefaultObjectID = FMath::Max(1, Val);
+										FScopedSpatialEdit Edit(M); M->ObjectBindings[BIdx].DefaultObjectID = FMath::Max(1, Val);
 										M->MarkPackageDirty();
 									}
 							})
@@ -1831,7 +1852,7 @@ TSharedRef<ITableRow> SSpatialFabricPanel::GenerateBindingRow(
 						if (ASpatialFabricManagerActor* M = GetManager())
 							if (M->ObjectBindings.IsValidIndex(BIdx))
 							{
-								M->ObjectBindings[BIdx].bEnabled = (State == ECheckBoxState::Checked);
+								FScopedSpatialEdit Edit(M); M->ObjectBindings[BIdx].bEnabled = (State == ECheckBoxState::Checked);
 								M->MarkPackageDirty();
 							}
 					})
@@ -1893,7 +1914,7 @@ TSharedRef<ITableRow> SSpatialFabricPanel::GenerateBindingRow(
 						{
 							if (ASpatialFabricManagerActor* M = GetManager())
 								if (FSpatialAdapterConfig* C = M->AdapterConfigs.Find((uint8)ESpatialAdapterType::ADMOSC))
-								{ C->ADMCoordinateMode = EADMCoordinateMode::Cartesian; M->MarkPackageDirty(); if (M->GetRouter()) M->InitializeAdapters(); }
+								{ FScopedSpatialEdit Edit(M); C->ADMCoordinateMode = EADMCoordinateMode::Cartesian; M->MarkPackageDirty(); if (M->GetRouter()) M->InitializeAdapters(); }
 							return FReply::Handled();
 						})
 						[ SNew(STextBlock).Text(LOCTEXT("ADMXYZBtn", "xyz")).Font(FAppStyle::GetFontStyle("SmallFont")).ColorAndOpacity(FLinearColor::White) ]
@@ -1913,7 +1934,7 @@ TSharedRef<ITableRow> SSpatialFabricPanel::GenerateBindingRow(
 						{
 							if (ASpatialFabricManagerActor* M = GetManager())
 								if (FSpatialAdapterConfig* C = M->AdapterConfigs.Find((uint8)ESpatialAdapterType::ADMOSC))
-								{ C->ADMCoordinateMode = EADMCoordinateMode::Polar; M->MarkPackageDirty(); if (M->GetRouter()) M->InitializeAdapters(); }
+								{ FScopedSpatialEdit Edit(M); C->ADMCoordinateMode = EADMCoordinateMode::Polar; M->MarkPackageDirty(); if (M->GetRouter()) M->InitializeAdapters(); }
 							return FReply::Handled();
 						})
 						[ SNew(STextBlock).Text(LOCTEXT("ADMAEDBtn", "aed")).Font(FAppStyle::GetFontStyle("SmallFont")).ColorAndOpacity(FLinearColor::White) ]
@@ -1933,7 +1954,7 @@ TSharedRef<ITableRow> SSpatialFabricPanel::GenerateBindingRow(
 						{
 							if (ASpatialFabricManagerActor* M = GetManager())
 								if (FSpatialAdapterConfig* C = M->AdapterConfigs.Find((uint8)ESpatialAdapterType::ADMOSC))
-								{ C->ADMCoordinateMode = EADMCoordinateMode::Both; M->MarkPackageDirty(); if (M->GetRouter()) M->InitializeAdapters(); }
+								{ FScopedSpatialEdit Edit(M); C->ADMCoordinateMode = EADMCoordinateMode::Both; M->MarkPackageDirty(); if (M->GetRouter()) M->InitializeAdapters(); }
 							return FReply::Handled();
 						})
 						[ SNew(STextBlock).Text(LOCTEXT("ADMBothBtn", "both")).Font(FAppStyle::GetFontStyle("SmallFont")).ColorAndOpacity(FLinearColor::White) ]
@@ -1970,7 +1991,7 @@ TSharedRef<ITableRow> SSpatialFabricPanel::GenerateBindingRow(
 							if (ASpatialFabricManagerActor* M = GetManager())
 								if (M->ObjectBindings.IsValidIndex(BIdx))
 								{
-									M->ObjectBindings[BIdx].Width01 = FMath::Clamp(Val, 0.f, 1.f);
+									FScopedSpatialEdit Edit(M); M->ObjectBindings[BIdx].Width01 = FMath::Clamp(Val, 0.f, 1.f);
 									M->MarkPackageDirty();
 								}
 						})
@@ -2008,7 +2029,7 @@ TSharedRef<ITableRow> SSpatialFabricPanel::GenerateBindingRow(
 							if (ASpatialFabricManagerActor* M = GetManager())
 								if (M->ObjectBindings.IsValidIndex(BIdx))
 								{
-									M->ObjectBindings[BIdx].bADMSendGain = (NewState == ECheckBoxState::Checked);
+									FScopedSpatialEdit Edit(M); M->ObjectBindings[BIdx].bADMSendGain = (NewState == ECheckBoxState::Checked);
 									M->MarkPackageDirty();
 								}
 						})
@@ -2045,7 +2066,7 @@ TSharedRef<ITableRow> SSpatialFabricPanel::GenerateBindingRow(
 								if (ASpatialFabricManagerActor* M = GetManager())
 									if (M->ObjectBindings.IsValidIndex(BIdx))
 									{
-										M->ObjectBindings[BIdx].GainLinear = FMath::Clamp(Val, 0.f, 2.f);
+										FScopedSpatialEdit Edit(M); M->ObjectBindings[BIdx].GainLinear = FMath::Clamp(Val, 0.f, 2.f);
 										M->MarkPackageDirty();
 									}
 							})
@@ -2076,7 +2097,7 @@ TSharedRef<ITableRow> SSpatialFabricPanel::GenerateBindingRow(
 							if (ASpatialFabricManagerActor* M = GetManager())
 								if (M->ObjectBindings.IsValidIndex(BIdx))
 								{
-									M->ObjectBindings[BIdx].bADMSendMute = (NewState == ECheckBoxState::Checked);
+									FScopedSpatialEdit Edit(M); M->ObjectBindings[BIdx].bADMSendMute = (NewState == ECheckBoxState::Checked);
 									M->MarkPackageDirty();
 								}
 						})
@@ -2117,7 +2138,7 @@ TSharedRef<ITableRow> SSpatialFabricPanel::GenerateBindingRow(
 								if (ASpatialFabricManagerActor* M = GetManager())
 									if (M->ObjectBindings.IsValidIndex(BIdx))
 									{
-										M->ObjectBindings[BIdx].bMuted = !M->ObjectBindings[BIdx].bMuted;
+										FScopedSpatialEdit Edit(M); M->ObjectBindings[BIdx].bMuted = !M->ObjectBindings[BIdx].bMuted;
 										M->MarkPackageDirty();
 									}
 								return FReply::Handled();
@@ -2162,7 +2183,7 @@ TSharedRef<ITableRow> SSpatialFabricPanel::GenerateBindingRow(
 							if (ASpatialFabricManagerActor* M = GetManager())
 								if (M->ObjectBindings.IsValidIndex(BIdx))
 								{
-									M->ObjectBindings[BIdx].bADMSendName = (NewState == ECheckBoxState::Checked);
+									FScopedSpatialEdit Edit(M); M->ObjectBindings[BIdx].bADMSendName = (NewState == ECheckBoxState::Checked);
 									M->MarkPackageDirty();
 								}
 						})
@@ -2199,7 +2220,7 @@ TSharedRef<ITableRow> SSpatialFabricPanel::GenerateBindingRow(
 								if (ASpatialFabricManagerActor* M = GetManager())
 									if (M->ObjectBindings.IsValidIndex(BIdx))
 									{
-										M->ObjectBindings[BIdx].ADMNameOverride = NewText.ToString();
+										FScopedSpatialEdit Edit(M); M->ObjectBindings[BIdx].ADMNameOverride = NewText.ToString();
 										M->MarkPackageDirty();
 									}
 							})
@@ -2240,6 +2261,7 @@ void SSpatialFabricPanel::OnAddSelectedActors()
 	ASpatialFabricManagerActor* Mgr = GetManager();
 	if (!Mgr || !GEditor) return;
 
+	FScopedSpatialEdit Edit(Mgr);
 	// Build set of already-bound actors
 	TSet<AActor*> AlreadyBound;
 	for (const FSpatialObjectBinding& B : Mgr->ObjectBindings)
@@ -2257,7 +2279,7 @@ void SSpatialFabricPanel::OnAddSelectedActors()
 	for (UObject* Obj : Selected)
 	{
 		AActor* Actor = Cast<AActor>(Obj);
-		if (!Actor || !IsValid(Actor))              continue;
+		if (!Actor || !IsValid(Actor) || Actor->GetWorld() != Mgr->GetWorld()) continue;
 		if (Cast<ASpatialFabricManagerActor>(Actor)) continue;
 		if (Cast<ASpatialStageVolume>(Actor))        continue;
 		if (AlreadyBound.Contains(Actor))            continue;
@@ -2299,11 +2321,12 @@ int32 SSpatialFabricPanel::GetNewActorCount() const
 	TArray<UObject*> Selected;
 	GEditor->GetSelectedActors()->GetSelectedObjects(AActor::StaticClass(), Selected);
 
+	const auto* Manager = GetManager();
 	int32 Count = 0;
 	for (UObject* Obj : Selected)
 	{
 		AActor* A = Cast<AActor>(Obj);
-		if (!A || !IsValid(A))              continue;
+		if (!A || !IsValid(A) || (Manager && A->GetWorld() != Manager->GetWorld())) continue;
 		if (Cast<ASpatialFabricManagerActor>(A)) continue;
 		if (Cast<ASpatialStageVolume>(A))    continue;
 		if (AlreadyBound.Contains(A))       continue;
@@ -2323,6 +2346,7 @@ void SSpatialFabricPanel::RemoveBinding(int32 Index)
 {
 	ASpatialFabricManagerActor* Mgr = GetManager();
 	if (!Mgr || !Mgr->ObjectBindings.IsValidIndex(Index)) return;
+	FScopedSpatialEdit Edit(Mgr);
 	Mgr->ObjectBindings.RemoveAt(Index);
 	Mgr->MarkPackageDirty();
 	RebuildBindingList();
@@ -2333,6 +2357,7 @@ void SSpatialFabricPanel::SetActiveFormat(ESpatialAdapterType Type)
 	ASpatialFabricManagerActor* Mgr = GetManager();
 	if (!Mgr) return;
 
+	FScopedSpatialEdit Edit(Mgr);
 	Mgr->ActiveAdapterType = Type;
 
 	// Enable only the selected adapter; disable all Phase-1 adapters' configs
@@ -2351,12 +2376,12 @@ void SSpatialFabricPanel::SetActiveFormat(ESpatialAdapterType Type)
 	// Re-route every existing binding to the new format
 	for (FSpatialObjectBinding& B : Mgr->ObjectBindings)
 	{
-		B.Targets.Empty();
-		FSpatialAdapterTargetEntry Entry;
-		Entry.AdapterType      = Type;
-		Entry.ObjectIDOverride = -1;
-		Entry.bEnabled         = true;
-		B.Targets.Add(Entry);
+		if (!B.Targets.ContainsByPredicate([Type](const FSpatialAdapterTargetEntry& Entry) { return Entry.AdapterType == Type; }))
+		{
+			FSpatialAdapterTargetEntry Entry;
+			Entry.AdapterType = Type;
+			B.Targets.Add(Entry);
+		}
 	}
 
 	Mgr->MarkPackageDirty();
@@ -2392,6 +2417,8 @@ FReply SSpatialFabricPanel::SpawnManagerActor()
 		: GEditor->GetEditorWorldContext().World();
 	if (!World) { return FReply::Handled(); }
 
+	const FScopedTransaction Transaction(LOCTEXT("SpawnManagerTransaction", "Spawn Spatial Manager"));
+	World->GetCurrentLevel()->Modify();
 	ASpatialFabricManagerActor* Manager =
 		ASpatialFabricManagerActor::GetOrSpawnManager(World);
 	if (!Manager) { return FReply::Handled(); }
@@ -2511,46 +2538,6 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildRadarTab()
 //  Tab — Output
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Format a preview line for one object given the active adapter type. */
-static FString FormatOutputPreview(
-	ESpatialAdapterType AdapterType,
-	const FSpatialNormalizedState& Obj,
-	EADMCoordinateMode ADMCoordMode = EADMCoordinateMode::Cartesian)
-{
-	const int32 ID = Obj.ObjectID;
-	switch (AdapterType)
-	{
-	case ESpatialAdapterType::ADMOSC:
-	{
-		const FVector& N = Obj.StageNormalized;
-		// ADM-OSC axis mapping: ADM X = our Y (right), ADM Y = our X (front), ADM Z = our Z (up)
-		const float ADMX = (float)N.Y;
-		const float ADMY = (float)N.X;
-		const float ADMZ = (float)N.Z;
-
-		FString Lines;
-		if (ADMCoordMode == EADMCoordinateMode::Cartesian || ADMCoordMode == EADMCoordinateMode::Both)
-			Lines += FString::Printf(TEXT("/adm/obj/%d/xyz  %.3f %.3f %.3f\n"), ID, ADMX, ADMY, ADMZ);
-		if (ADMCoordMode == EADMCoordinateMode::Polar || ADMCoordMode == EADMCoordinateMode::Both)
-		{
-			const FVector Polar = FSpatialMath::CartesianToPolar(N);
-			const float Dist = FMath::Clamp((float)Polar.Z / FMath::Sqrt(3.0f), 0.0f, 1.0f);
-			Lines += FString::Printf(TEXT("/adm/obj/%d/aed  %.1f %.1f %.3f\n"), ID, (float)Polar.X, (float)Polar.Y, Dist);
-		}
-		Lines += FString::Printf(TEXT("/adm/obj/%d/w  %.3f"), ID, Obj.Width01);
-		return Lines;
-	}
-	case ESpatialAdapterType::Custom:
-	{
-		const FVector& N = Obj.StageNormalized;
-		return FString::Printf(TEXT("/source/%d/position  %.3f %.3f %.3f"), ID, N.X, N.Y, N.Z);
-	}
-	default:
-		return FString::Printf(TEXT("[%d] %.3f %.3f %.3f"), ID,
-			Obj.StageNormalized.X, Obj.StageNormalized.Y, Obj.StageNormalized.Z);
-	}
-}
-
 TSharedRef<SWidget> SSpatialFabricPanel::BuildOutputTab()
 {
 	return SNew(SVerticalBox)
@@ -2608,34 +2595,8 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildOutputTab()
 					ASpatialFabricManagerActor* Mgr = GetManager();
 					if (!Mgr) { return LOCTEXT("OutputNoMgr", "No SpatialFabricManagerActor in level"); }
 
-					const FSpatialFrameSnapshot& Snap = Mgr->GetLastSnapshot();
-					if (SFArrayIsEmpty(Snap.Objects)) { return LOCTEXT("OutputEmpty", "No objects tracked"); }
-
-					const ESpatialAdapterType Type = Mgr->ActiveAdapterType;
-					const uint8 TypeKey = static_cast<uint8>(Type);
-					const FSpatialAdapterConfig* Cfg = Mgr->AdapterConfigs.Find(TypeKey);
-					const EADMCoordinateMode ADMCoordMode = Cfg
-						? Cfg->ADMCoordinateMode
-						: EADMCoordinateMode::Cartesian;
-
-					FString Result;
-					for (const FSpatialNormalizedState& Obj : Snap.Objects)
-					{
-						const FString Muted = Obj.bMuted ? TEXT(" [MUTED]") : TEXT("");
-						Result += FString::Printf(TEXT("%s (ID %d)%s\n  %s\n"),
-							*Obj.Label, Obj.ObjectID, *Muted,
-							*FormatOutputPreview(Type, Obj, ADMCoordMode));
-					}
-
-					if (Snap.bHasListener)
-					{
-						const FVector& LP = Snap.ListenerNormalized;
-						const FRotator& LR = Snap.ListenerYPR;
-						Result += FString::Printf(TEXT("\nListener\n  xyz: %.3f %.3f %.3f  ypr: %.1f %.1f %.1f"),
-							LP.X, LP.Y, LP.Z, LR.Yaw, LR.Pitch, LR.Roll);
-					}
-
-					return FText::FromString(Result);
+					const FString Preview = Mgr->BuildOutputPreview();
+					return Preview.IsEmpty() ? LOCTEXT("OutputEmpty", "No messages routed (check bindings, templates, and adapter enablement)") : FText::FromString(Preview);
 				})
 				.Font(FAppStyle::GetFontStyle("SmallFont"))
 				.AutoWrapText(false)

@@ -1,207 +1,62 @@
-// Copyright (c) 2026 SpatialFabric Contributors. Licensed under the MIT License.
-
-/**
- * ADM-OSC adapter: maps our StageNormalized (+X front, +Y right, +Z up) to spec
- * Cartesian (ADM X=right, Y=front, Z=up) in SendCartesian/SendListener.
- */
-
+// Copyright (c) 2026 SpatialFabric Contributors. MIT License.
 #include "Adapters/ADMOSCAdapter.h"
 #include "SpatialOSCClientComponent.h"
 #include "SpatialMath.h"
 
 void FADMOSCAdapter::Configure(const FSpatialAdapterConfig& InConfig)
 {
-	Config = InConfig;
-	CoordMode = InConfig.ADMCoordinateMode;
-	CachedSendRateHz = InConfig.SendRateHz;
-	LastSentByID.Reset();
-	LastListenerNorm = FVector(FLT_MAX, FLT_MAX, FLT_MAX);
-	LastListenerYPR = FRotator(FLT_MAX, FLT_MAX, FLT_MAX);
+    Config = InConfig;
+    CoordMode = Config.ADMCoordinateMode;
+    CachedSendRateHz = Config.SendRateHz;
+    TimeSinceLastSend = 0.f;
+    LastMessages.Reset();
+    bConnectionConfirmed = false; LastReplyTime = -1; SecondsSinceLastReply = -1;
 }
-
-void FADMOSCAdapter::SetClientComponent(USpatialOSCClientComponent* InClient)
+void FADMOSCAdapter::SetClientComponent(USpatialOSCClientComponent* InClient) { Client = InClient; }
+void FADMOSCAdapter::HandleIncomingOSC(const FString& Address, float)
 {
-	Client = InClient;
+    if (Address.StartsWith(TEXT("/adm/"))) { bConnectionConfirmed = true; LastReplyTime = FPlatformTime::Seconds(); }
 }
-
-void FADMOSCAdapter::HandleIncomingOSC(const FString& Address, float /*Value*/)
+TArray<FSpatialOSCMessage> FADMOSCAdapter::BuildMessages(const FSpatialFrameSnapshot& Snapshot) const
 {
-	if (Address.StartsWith(TEXT("/adm/")))
-	{
-		bConnectionConfirmed = true;
-		LastReplyTime = FPlatformTime::Seconds();
-	}
+    TArray<FSpatialOSCMessage> Result;
+    for (const auto& State : Snapshot.Objects)
+    {
+        if (State.ObjectID < 1 || State.StageNormalized.ContainsNaN()) continue;
+        // ADM distance is a unit-sphere radius. Both encodings use the SAME point.
+        const FVector P = State.StageNormalized.GetClampedToMaxSize(1.0);
+        const FString Base = FString::Printf(TEXT("/adm/obj/%d/"), State.ObjectID);
+        if (CoordMode != EADMCoordinateMode::Polar)
+            Result.Add({Base + TEXT("xyz"), {(float)P.Y, (float)P.X, (float)P.Z}, {}, {}});
+        if (CoordMode != EADMCoordinateMode::Cartesian)
+        {
+            const FVector Polar = FSpatialMath::CartesianToPolar(P);
+            Result.Add({Base + TEXT("aed"), {(float)Polar.X, (float)Polar.Y, (float)Polar.Z}, {}, {}});
+        }
+        Result.Add({Base + TEXT("w"), {FMath::Clamp(State.Width01, 0.f, 1.f)}, {}, {}});
+        if (State.bADMSendGain) Result.Add({Base + TEXT("gain"), {FMath::Max(0.f, State.GainLinear)}, {}, {}});
+        if (State.bADMSendMute) Result.Add({Base + TEXT("mute"), {}, {State.bMuted ? 1 : 0}, {}});
+        if (State.bADMSendName) Result.Add({Base + TEXT("name"), {}, {}, {State.ADMName.IsEmpty() ? State.Label : State.ADMName}});
+        Result.Add({Base + TEXT("dref"), {FMath::Clamp(State.Dref, 0.f, 1.f)}, {}, {}});
+        if (State.Dmax > 0.f) Result.Add({Base + TEXT("dmax"), {State.Dmax}, {}, {}});
+    }
+    if (Snapshot.bHasListener)
+    {
+        const auto& P = Snapshot.ListenerNormalized;
+        const auto& R = Snapshot.ListenerYPR;
+        Result.Add({TEXT("/adm/lis/xyz"), {(float)P.Y, (float)P.X, (float)P.Z}, {}, {}});
+        Result.Add({TEXT("/adm/lis/ypr"), {-(float)R.Yaw, (float)R.Pitch, -(float)R.Roll}, {}, {}});
+    }
+    return Result;
 }
-
 void FADMOSCAdapter::ProcessFrame(const FSpatialFrameSnapshot& Snapshot, float DeltaTime)
 {
-	if (!Config.bEnabled || !Client) { return; }
-
-	// Update staleness counter for connection confirmation UI.
-	if (LastReplyTime >= 0.0)
-	{
-		SecondsSinceLastReply = FPlatformTime::Seconds() - LastReplyTime;
-	}
-
-	if (!ShouldSendThisFrame(DeltaTime)) { return; }
-
-	// Retarget shared client to this adapter's IP:port (see SpatialOSCClientComponent)
-	Client->Connect(Config.TargetIP, Config.TargetPort);
-
-	for (const FSpatialNormalizedState& State : Snapshot.Objects)
-	{
-		if (Config.bSendOnlyOnChange)
-		{
-			FADMCachedState& Cache = LastSentByID.FindOrAdd(State.ObjectID);
-			const bool bPosChanged = !State.StageNormalized.Equals(Cache.PosNorm, UE_KINDA_SMALL_NUMBER);
-			const bool bGainChanged = FMath::Abs(State.GainLinear - Cache.GainLinear) > UE_KINDA_SMALL_NUMBER;
-			const bool bWidthChanged = FMath::Abs(State.Width01 - Cache.Width01) > UE_KINDA_SMALL_NUMBER;
-			const bool bMuteChanged = (State.bMuted != Cache.bMuted);
-			const bool bLabelChanged = (State.bADMSendName && State.Label != Cache.Label);
-			// Skip duplicate packets when nothing relevant changed (saves UDP bandwidth)
-			if (!bPosChanged && !bGainChanged && !bWidthChanged && !bMuteChanged && !bLabelChanged && Cache.bEverSent)
-			{
-				continue;
-			}
-			Cache.PosNorm = State.StageNormalized;
-			Cache.GainLinear = State.GainLinear;
-			Cache.Width01 = State.Width01;
-			Cache.bMuted = State.bMuted;
-			Cache.Label = State.Label;
-			Cache.bEverSent = true;
-		}
-		SendObject(State);
-	}
-
-	if (Snapshot.bHasListener)
-	{
-		if (Config.bSendOnlyOnChange)
-		{
-			const bool bLisChanged = !Snapshot.ListenerNormalized.Equals(LastListenerNorm, UE_KINDA_SMALL_NUMBER)
-				|| !Snapshot.ListenerYPR.Equals(LastListenerYPR, UE_KINDA_SMALL_NUMBER);
-			if (!bLisChanged && bListenerEverSent) { /* skip */ }
-			else
-			{
-				LastListenerNorm = Snapshot.ListenerNormalized;
-				LastListenerYPR = Snapshot.ListenerYPR;
-				bListenerEverSent = true;
-				SendListener(Snapshot);
-			}
-		}
-		else
-		{
-			SendListener(Snapshot);
-		}
-	}
-}
-
-void FADMOSCAdapter::SendObject(const FSpatialNormalizedState& State)
-{
-	if (!Client) { return; }
-
-	const int32 ID = State.ObjectID;
-	// ADM-OSC spec: Cartesian x,y,z and polar inputs must be normalized [-1,1].
-	// Clamp defensively so we never emit out-of-spec values.
-	const FVector P(
-		FMath::Clamp((float)State.StageNormalized.X, -1.f, 1.f),
-		FMath::Clamp((float)State.StageNormalized.Y, -1.f, 1.f),
-		FMath::Clamp((float)State.StageNormalized.Z, -1.f, 1.f));
-
-	// ── Position (coordinate mode) ──────────────────────────────────────
-	if (CoordMode == EADMCoordinateMode::Cartesian || CoordMode == EADMCoordinateMode::Both)
-	{
-		SendCartesian(ID, P);
-	}
-	if (CoordMode == EADMCoordinateMode::Polar || CoordMode == EADMCoordinateMode::Both)
-	{
-		SendPolar(ID, P);
-	}
-
-	// ── /adm/obj/{n}/w  (float, horizontal extent [0..1]) ───────────────
-	Client->SendFloat(FString::Printf(TEXT("/adm/obj/%d/w"), ID), State.Width01);
-
-	// ── Optional per-object metadata (enabled per-binding) ──────────────
-	if (State.bADMSendGain)
-	{
-		Client->SendFloat(FString::Printf(TEXT("/adm/obj/%d/gain"), ID), State.GainLinear);
-	}
-	if (State.bADMSendMute)
-	{
-		Client->SendInt(FString::Printf(TEXT("/adm/obj/%d/mute"), ID), State.bMuted ? 1 : 0);
-	}
-	if (State.bADMSendName)
-	{
-		Client->SendString(FString::Printf(TEXT("/adm/obj/%d/name"), ID), State.Label);
-	}
-}
-
-void FADMOSCAdapter::SendCartesian(int32 ID, const FVector& Norm)
-{
-	const FString Addr = FString::Printf(TEXT("/adm/obj/%d/xyz"), ID);
-	// ADM-OSC Cartesian axis mapping (spec: X=right, Y=forward, Z=up):
-	//   ADM X = our +Y (right)
-	//   ADM Y = our +X (front)
-	//   ADM Z = our +Z (up)
-	// Norm is pre-clamped to [-1,1] in SendObject.
-	const float ADMX = (float)Norm.Y;
-	const float ADMY = (float)Norm.X;
-	const float ADMZ = (float)Norm.Z;
-	Client->SendMultiArg(Addr, { ADMX, ADMY, ADMZ });
-
-	if (OnLog)
-	{
-		FSpatialFabricLogEntry Entry;
-		Entry.Adapter   = TEXT("ADMOSC");
-		Entry.Direction = TEXT("OUT");
-		Entry.Address   = Addr;
-		Entry.ValueStr  = FString::Printf(TEXT("%.3f %.3f %.3f"), ADMX, ADMY, ADMZ);
-		FDateTime Now = FDateTime::Now();
-		Entry.Timestamp = FString::Printf(TEXT("%02d:%02d:%02d"),
-			Now.GetHour(), Now.GetMinute(), Now.GetSecond());
-		OnLog(Entry);
-	}
-}
-
-void FADMOSCAdapter::SendPolar(int32 ID, const FVector& Norm)
-{
-	// CartesianToPolar returns (azimuth°, elevation°, distance)
-	const FVector Polar = FSpatialMath::CartesianToPolar(Norm);
-
-	// ADM-OSC spec: dist must be in [0, 1].  Raw Euclidean magnitude of a
-	// normalized [-1,1]^3 position can reach √3 ≈ 1.732 at a stage corner.
-	// Divide by √3 to map the full stage cube onto [0, 1].
-	const float NormalizedDist = FMath::Clamp((float)Polar.Z / FMath::Sqrt(3.0f), 0.0f, 1.0f);
-	// Spec: azimuth [-180, 180], elevation [-90, 90].  atan2 stays in range
-	// analytically, but clamp defensively for NaN safety and spec compliance.
-	const float ClampedAzim = FMath::Clamp((float)Polar.X, -180.0f, 180.0f);
-	const float ClampedElev = FMath::Clamp((float)Polar.Y, -90.0f, 90.0f);
-
-	const FString Addr = FString::Printf(TEXT("/adm/obj/%d/aed"), ID);
-	Client->SendMultiArg(Addr, { ClampedAzim, ClampedElev, NormalizedDist });
-
-	if (OnLog)
-	{
-		FSpatialFabricLogEntry Entry;
-		Entry.Adapter   = TEXT("ADMOSC");
-		Entry.Direction = TEXT("OUT");
-		Entry.Address   = Addr;
-		Entry.ValueStr  = FString::Printf(TEXT("%.1f %.1f %.3f"), ClampedAzim, ClampedElev, NormalizedDist);
-		FDateTime Now = FDateTime::Now();
-		Entry.Timestamp = FString::Printf(TEXT("%02d:%02d:%02d"),
-			Now.GetHour(), Now.GetMinute(), Now.GetSecond());
-		OnLog(Entry);
-	}
-}
-
-void FADMOSCAdapter::SendListener(const FSpatialFrameSnapshot& Snapshot)
-{
-	if (!Client) { return; }
-
-	const FVector& LP = Snapshot.ListenerNormalized;
-	const FRotator& LR = Snapshot.ListenerYPR;
-
-	// ADM-OSC Cartesian axis mapping (spec: X=right, Y=forward, Z=up).
-	Client->SendMultiArg(TEXT("/adm/lis/xyz"), { (float)LP.Y, (float)LP.X, (float)LP.Z });
-	Client->SendMultiArg(TEXT("/adm/lis/ypr"),
-		{ (float)LR.Yaw, (float)LR.Pitch, (float)LR.Roll });
+    if (LastReplyTime >= 0) SecondsSinceLastReply = FPlatformTime::Seconds() - LastReplyTime;
+    if (!Config.bEnabled || !Client || !ShouldSendThisFrame(DeltaTime)) return;
+    Client->Connect(Config.TargetIP, Config.TargetPort);
+    if (!Client->IsConnected()) { LastMessages.Reset(); return; }
+    const auto Messages = BuildMessages(Snapshot);
+    if (Config.bSendOnlyOnChange && Messages == LastMessages) return;
+    Transmit(Client, Messages);
+    LastMessages = Messages;
 }

@@ -11,6 +11,7 @@
 #include "SpatialStageVolume.h"
 #include "EngineUtils.h"
 #include "GameFramework/Actor.h"
+#include "UObject/Package.h"
 
 USpatialObjectRegistry::USpatialObjectRegistry()
 {
@@ -29,11 +30,11 @@ FSpatialFrameSnapshot USpatialObjectRegistry::BuildSnapshot(
 	{
 		const FVector ListenerWorld = Stage->GetListenerWorldPosition();
 		Snapshot.ListenerNormalized = Stage->WorldToNormalized(ListenerWorld);
-		Snapshot.ListenerYPR        = Stage->GetListenerYPR();
+		Snapshot.ListenerYPR        = FRotator::ZeroRotator; // objects already use the full listener-relative basis
 		Snapshot.bHasListener       = true;
 	}
 
-	// Snapshot.Objects order = enabled bindings in array order (router relies on this)
+	// Only resolved enabled objects are emitted; explicit BindingIndex preserves identity.
 	for (int32 i = 0; i < Bindings.Num(); ++i)
 	{
 		const FSpatialObjectBinding& Binding = Bindings[i];
@@ -61,7 +62,9 @@ FSpatialFrameSnapshot USpatialObjectRegistry::BuildSnapshot(
 		const FQuat   WorldRot = Actor->GetActorQuat();
 
 		FSpatialNormalizedState State;
+		State.BindingIndex = i;
 		State.Label = Binding.Label.IsEmpty() ? Actor->GetActorNameOrLabel() : Binding.Label;
+		State.ADMName = Binding.ADMNameOverride.IsEmpty() ? Actor->GetActorNameOrLabel() : Binding.ADMNameOverride;
 		State.ObjectID = Binding.DefaultObjectID; // per-target overrides applied later in router
 		State.GainLinear = Binding.GainLinear;
 		State.Width01    = Binding.Width01;
@@ -110,20 +113,34 @@ AActor* USpatialObjectRegistry::ResolveActor(
 	if (!SoftPtr.IsNull())
 	{
 		AActor* Actor = SoftPtr.Get();
-		if (Actor) { return Actor; }
+		if (IsValid(Actor) && Actor->GetWorld() == GetWorld()) { return Actor; }
 	}
 
-	// Fallback: scan by cached label
-	if (!CachedLabel.IsEmpty() && GetWorld())
+	if (GetWorld() && GetWorld()->WorldType == EWorldType::PIE)
 	{
+		FSoftObjectPath PIEPath = SoftPtr.ToSoftObjectPath();
+		PIEPath.FixupForPIE(GetWorld()->GetOutermost()->GetPIEInstanceID());
+		if (AActor* Actor = Cast<AActor>(PIEPath.ResolveObject()); IsValid(Actor) && Actor->GetWorld() == GetWorld()) return Actor;
+	}
+	// Prefer the serialized object name in this world. Never pick an ambiguous label.
+	AActor* Match = nullptr;
+	int32 Matches = 0;
+	if (GetWorld())
+	{
+		const FString ObjectName = SoftPtr.ToSoftObjectPath().GetSubPathString();
+		FString Leaf;
+		ObjectName.Split(TEXT("."), nullptr, &Leaf, ESearchCase::CaseSensitive, ESearchDir::FromEnd);
 		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
 		{
-			if ((*It)->GetActorNameOrLabel() == CachedLabel)
-			{
-				return *It;
-			}
+			if (IsValid(*It) && !Leaf.IsEmpty() && It->GetName() == Leaf)
+			{ Match = *It; ++Matches; }
+		}
+		if (Matches > 0) return Matches == 1 ? Match : nullptr;
+		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+		{
+			if (IsValid(*It) && !CachedLabel.IsEmpty() && It->GetActorNameOrLabel() == CachedLabel)
+			{ Match = *It; ++Matches; }
 		}
 	}
-
-	return nullptr;
+	return Matches == 1 ? Match : nullptr;
 }

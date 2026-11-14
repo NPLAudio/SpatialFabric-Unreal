@@ -10,6 +10,7 @@
 #include "Components/BoxComponent.h"
 #include "DrawDebugHelpers.h"
 #include "GameFramework/Actor.h"
+#include "GameFramework/Pawn.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "EngineUtils.h"
@@ -33,7 +34,7 @@ ASpatialStageVolume::ASpatialStageVolume()
 FVector ASpatialStageVolume::ComputeLocalVector(FVector WorldPos) const
 {
 	// Vector from listener (or stage center when Off) to the world point
-	FVector Local = WorldPos - CachedListenerPos;
+	FVector Local = WorldPos - (bListenerResolved ? CachedListenerPos : StageBox->GetComponentLocation());
 
 	if (bListenerResolved && ListenerMode == EListenerMode::FollowPositionAndOrientation)
 	{
@@ -85,11 +86,6 @@ void ASpatialStageVolume::ResolveListenerThisFrame()
 	// ── Off: restore design location and use box origin ────────────────────
 	if (ListenerMode == EListenerMode::Off)
 	{
-		if (!GetActorLocation().Equals(DesignLocation, 0.1f))
-		{
-			SetActorLocation(DesignLocation);
-			SetActorRotation(DesignRotation);
-		}
 		CachedListenerPos = StageBox->GetComponentLocation();
 		return;
 	}
@@ -113,6 +109,7 @@ void ASpatialStageVolume::ResolveListenerThisFrame()
 	if (!ResolvedActor && !ListenerActor.IsNull())
 	{
 		ResolvedActor = ListenerActor.Get();
+		if (ResolvedActor && ResolvedActor->GetWorld() != GetWorld()) ResolvedActor = nullptr;
 		if (!ResolvedActor && GetWorld())
 		{
 			for (TActorIterator<AActor> It(GetWorld()); It; ++It)
@@ -143,10 +140,8 @@ void ASpatialStageVolume::ResolveListenerThisFrame()
 			CachedListenerRot = ResolvedActor->GetActorRotation();
 		bListenerResolved = true;
 
-		// Move the stage box so it stays centered on the listener.
-		SetActorLocation(CachedListenerPos);
-		if (ListenerMode == EListenerMode::FollowPositionAndOrientation)
-			SetActorRotation(CachedListenerRot);
+		// Follow in coordinate space only. Moving an ancestor of the listener
+		// creates transform feedback and also mutates authored editor transforms.
 		return;
 	}
 
@@ -199,9 +194,9 @@ void ASpatialStageVolume::Tick(float DeltaTime)
 	// Skip debug draw when hidden (via "Hide stage in PIE" checkbox)
 	if (!bHideDebugDraw && (!GetRootComponent() || !GetRootComponent()->bHiddenInGame))
 	{
-		const FVector BoxCenter  = StageBox->GetComponentLocation();
+		const FVector BoxCenter  = bListenerResolved ? CachedListenerPos : StageBox->GetComponentLocation();
 		const FVector HalfExtent = StageBox->GetScaledBoxExtent();
-		const FQuat   BoxRot     = StageBox->GetComponentQuat();
+		const FQuat   BoxRot     = bListenerResolved ? CachedListenerRot.Quaternion() : StageBox->GetComponentQuat();
 
 		DrawDebugBox(GetWorld(), BoxCenter, HalfExtent, BoxRot,
 			FColor(0, 200, 255), false, -1.f, 0, 2.f);

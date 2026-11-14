@@ -1,10 +1,25 @@
+![SpatialFabric and AudioLoom, woven together](../assets/spatialfabric-unified.png)
+
 # SpatialFabric — codebase guide
 
 This document explains **how the plugin fits together** before you dive into C++ files. Read it once, then use file-top comments in the source as a map.
 
 ## What SpatialFabric does (one sentence)
 
-It reads **Unreal actor positions** inside a **stage box**, converts them to **normalized coordinates**, and sends **OSC messages** to external spatial audio systems (ADM-OSC, or your own templates).
+It reads actor positions into a stable-identity snapshot, encodes/routes OSC for external spatial systems, and includes independent direct-device PCM playback. Spatial and playback output are separate pipelines.
+
+## Included audio playback modules
+
+The same `SpatialFabric.uplugin` also owns `Source/AudioLoom` (runtime device/channel
+playback, SoundWave loading, OSC transport subsystem) and `Source/AudioLoomEditor`
+(playback panel, Details customization, CSV routing). `SpatialFabricEditor` embeds
+`SAudioLoomPanel` as its **Playback** tab. The legacy modules/class names are retained
+to preserve serialized `/Script/AudioLoom` references and existing C++ dependencies.
+
+This is one installable plugin, not one runtime pipeline: spatial snapshots drive
+external positioning protocols; AudioLoom plays PCM directly to OS devices. The
+OSC servers/settings are independent. See [Audio playback](AudioPlayback.md) for
+migration, ports, platform support, and known limitations.
 
 ## Main ideas (no jargon)
 
@@ -18,10 +33,12 @@ It reads **Unreal actor positions** inside a **stage box**, converts them to **n
 
 ## Data flow (every frame)
 
-1. **`ASpatialFabricManagerActor::Tick`** runs (or the editor tickable calls **`ProcessFrame`** without PIE).
+1. **`ASpatialFabricManagerActor::Tick`** runs (or the editor tickable calls **`ProcessFrame`** on existing managers without PIE). Preview state capture is independent of networking permission; actors are never auto-spawned by the tickable.
 2. **`USpatialObjectRegistry::BuildSnapshot`** walks **`ObjectBindings`**, resolves each **`TargetActor`**, and fills **`FSpatialFrameSnapshot`** using **`ASpatialStageVolume`** for normalization.
 3. **`FProtocolRouter::ProcessFrame`** filters the snapshot per adapter type, then calls **`ISpatialProtocolAdapter::ProcessFrame`** on ADM-OSC and Custom adapters.
-4. Adapters use **`USpatialOSCClientComponent`** to send UDP OSC to **`TargetIP:TargetPort`** from **`FSpatialAdapterConfig`**.
+4. Each state carries its source `BindingIndex`; the router never infers association from compacted array position. Adapters' pure `BuildMessages` encoders produce the same messages for preview and transmission.
+5. Adapters use a reusable **`USpatialOSCClientComponent`** to send to their configured endpoint. Complete encoded messages determine send-on-change behavior.
+6. Listener following updates a virtual coordinate basis, never the authored stage transform. ADM xyz/aed share a radially limited unit-sphere position.
 
 ## Suggested reading order (C++)
 
@@ -59,6 +76,12 @@ It reads **Unreal actor positions** inside a **stage box**, converts them to **n
 ## Tests
 
 Automation tests live in **`SpatialFabricTests.cpp`**. They validate math and address strings without loading a full level.
+
+Run `python -m unittest discover -s Tools -p "test_*.py"` from the plugin root for
+structural and native-report-runner checks. Run `Tools/validate_unreal.py --engine
+<UE install>` for Editor/Development/Shipping compilation and actual native regressions.
+See `VALIDATION.md` for the manual hardware/cooked-content release gates. Automation
+results are read from JSON, not Unreal's sometimes-zero failure exit status.
 
 ---
 

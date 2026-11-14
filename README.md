@@ -1,12 +1,13 @@
 <div align="center">
-  <img src="assets/logo.png" alt="SpatialFabric" width="256" height="256"/>
+  <img src="assets/spatialfabric-unified.png" alt="SpatialFabric — spatial control and AudioLoom direct playback, woven together" width="960"/>
 </div>
 
 # SpatialFabric [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-yellow?logo=buymeacoffee)](https://buymeacoffee.com/notpunny)
 
-Multi-protocol spatial audio show-control plugin for Unreal Engine. Maps UE
-actor positions to spatial audio processors via **ADM-OSC** —
-without writing a line of Blueprint or C++.
+Spatial audio control and direct audio playback in one Unreal Engine plugin.
+Maps UE actor positions to spatial audio processors via **ADM-OSC** and Custom OSC,
+and includes **AudioLoom** device/channel playback, OSC transport controls, and CSV routing.
+Use **Window → Spatial Fabric** for spatial setup and the new **Playback** tab for audio.
 
 Through ADM-OSC, a single output reaches any compatible spatial audio processor: L-Acoustics
 L-ISA, FLUX:: SPAT Revolution, d&b Soundscape, Meyer Sound SpaceMap Go, TiMax
@@ -22,6 +23,7 @@ need real-time spatial audio positioning from Unreal Engine.
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
+- [Audio Playback & Migration](#audio-playback--migration)
 - [Coordinate Convention](#coordinate-convention)
 - [Feature Overview](#feature-overview)
 - [Supported Protocols](#supported-protocols)
@@ -38,13 +40,15 @@ need real-time spatial audio positioning from Unreal Engine.
 
 | Requirement | Version |
 |-------------|---------|
-| Unreal Engine | **5.4 - 5.7** |
+| Unreal Engine | **5.8 validated on Win64**; other versions/platforms require native validation |
 | Visual Studio | 2022 (Windows) or Xcode 15+ (macOS) |
 | UE Plugin | **OSC** (built-in, must be enabled) |
 
 SpatialFabric includes its own `USpatialOSCClientComponent` and
 `USpatialOSCServerComponent` that wrap UE's built-in OSC plugin directly.
-No additional plugins are required beyond OSC.
+No additional plugins are required beyond OSC. Direct audio playback supports
+**Windows and macOS**; it is separate from spatial positioning and does not
+spatialize PCM through the ADM-OSC output.
 
 ---
 
@@ -74,7 +78,7 @@ No additional plugins are required beyond OSC.
    - Edit → Plugins → search **"SpatialFabric"** → enable → restart the editor.
 
 5. **Verify** by opening Window → **Spatial Fabric**. The panel should appear
-   with Stage, Objects, Radar, and Output tabs.
+   with Stage, Objects, Radar, Output, and Playback tabs.
 
 ### Option B — Add to an existing .uproject manually
 
@@ -151,11 +155,31 @@ SpatialFabric
 
 ### Protokol not receiving?
 
-1. **Press Play** — OSC is only sent when the game is running (PIE or packaged).
+1. **Check permissions and manager** — spatial preview/output works in editor or PIE when a placed Manager exists and Enable In Editor is on. Packaged networking requires opt-in.
 2. **Protokol receive port** — Add an OSC Input in Protokol that **receives/listens** on port **50018** (default). Unreal sends TO this port; Protokol must bind to it.
 3. **Target IP** — Ensure the Manager sends to `127.0.0.1` if Protokol is on the same machine.
 4. **Objects bound** — You must have at least one object bound with the ADM-OSC target enabled. Use **+ Add Selected Actors** in the Objects tab.
 5. **Enable Debug Messages** — Project Settings → Plugins → Spatial Fabric → Enable Debug Messages to see OSC connect/disconnect in the Output Log.
+
+---
+
+## Audio Playback & Migration
+
+AudioLoom is now included in SpatialFabric. Install **only SpatialFabric**, not both
+plugins: the combined plugin preserves AudioLoom's module/class names for existing
+Blueprints, assets, and C++ callers.
+
+- Open **Window → Spatial Fabric**, then **Playback**.
+- Add an **Audio Loom** actor/component, assign a SoundWave, and choose device/channel.
+- Configure playback OSC in **Project Settings → Plugins → Spatial Fabric Playback OSC**.
+- Existing `/audioloom/...` OSC addresses and Engine config sections are unchanged.
+- Spatial OSC and playback OSC remain independent; a spatial manager is not needed
+  for direct playback.
+
+See [Audio playback setup, limitations, and migration](Docs/AudioPlayback.md) before
+upgrading an existing AudioLoom project. This is a packaging/UI consolidation;
+the safety/routing fixes and validation status are tracked in [FIXES.md](FIXES.md).
+Review the intentional v2 OSC, listener, and cooked-audio migration changes in the guide.
 
 ---
 
@@ -243,7 +267,7 @@ network traffic when objects are static.
 
 ### Editor Panel
 
-A dockable Slate panel with four tabs for configuration and live monitoring
+A dockable Slate panel with five tabs for configuration, playback, and live monitoring
 without requiring Play mode. **ADM-OSC** is shown by default in the Objects
 tab; ADM-OSC and Custom are available in the Manager Actor's
 Details panel for advanced use.
@@ -327,18 +351,19 @@ protocol-specific adapters.
 
 ## Editor Panel
 
-Open via Window → **Spatial Fabric**. The panel has four tabs:
+Open via Window → **Spatial Fabric**. The panel has five tabs:
 
 | Tab | Purpose |
 |-----|---------|
 | **Stage** | Stage Volume assignment, physical dimensions, listener config |
 | **Objects** | Add/remove object bindings, set Object IDs, format selector (ADM-OSC, Custom) |
 | **Radar** | Live 2D top-down visualization with aspect-correct stage coordinates (front=top, right=right) |
-| **Output** | Live protocol message preview and scrolling message log |
+| **Output** | Preview from the actual routed encoders and scrolling message log |
+| **Playback** | Direct audio device/channel playback, OSC transport, and routing CSV |
 
 **Objects tab:** The format selector (ADM-OSC, Custom) switches the
 active adapter. The **Rate (Hz)** control sets the polling limit (1–120 Hz);
-**Only when changed** sends only when coordinates change (full state on start).
+**Only when changed** compares encoded packets, including metadata and address changes.
 When **Custom** is selected, a template section appears with coordinate mode
 (xyz/aed), send mode (bundled/discrete), address and args templates, and range
 mapping. Each object row has an **enable checkbox** and a **delete icon** to
@@ -426,7 +451,7 @@ Plugins/SpatialFabric/
 Each tick:
   ASpatialStageVolume::ResolveListenerThisFrame()
     → cache listener position/rotation
-    → if auto-follow: teleport stage volume to listener
+    → use a virtual listener-relative basis (never move the authored stage actor)
 
   USpatialObjectRegistry::BuildSnapshot(Bindings, StageVolume)
     → resolve soft actor pointers (with cached label fallback)

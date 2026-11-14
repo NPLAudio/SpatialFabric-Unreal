@@ -28,6 +28,12 @@ Saved/
 .DS_Store
 Thumbs.db
 
-# Docs/ — ignore contents except guide (git needs Docs/* not Docs/ for ! exception)
+# Docs/ — retain public guides; ignore local working notes
 Docs/*
 !Docs/CODEBASE_GUIDE.md
+!Docs/AudioPlayback.md
+
+# Release output and Python caches
+dist/
+__pycache__/
+*.pyc

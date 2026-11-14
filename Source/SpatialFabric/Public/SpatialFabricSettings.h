@@ -45,6 +45,10 @@ public:
 		meta = (ClampMin = "1024", ClampMax = "65535"))
 	int32 DefaultOSCListenPort = 8100;
 
+	/** Loopback by default. Set 0.0.0.0 only on a trusted/firewalled control network. */
+	UPROPERTY(EditAnywhere, config, Category = "SpatialFabric|Ports")
+	FString DefaultOSCListenIP = TEXT("127.0.0.1");
+
 	// ── Default outgoing IP and ports per adapter ──────────────────────────
 	/** Saved when user changes IP in the panel; used when spawning new managers. */
 	UPROPERTY(EditAnywhere, config, Category = "SpatialFabric|Ports")

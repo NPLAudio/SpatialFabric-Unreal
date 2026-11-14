@@ -60,6 +60,7 @@ public:
 
 	/** Returns the registered adapter for the given type, or nullptr. */
 	ISpatialProtocolAdapter* FindAdapter(ESpatialAdapterType Type) const;
+	FString BuildPreview(const FSpatialFrameSnapshot& Snapshot, const TArray<FSpatialObjectBinding>& Bindings) const;
 
 private:
 	TArray<TSharedPtr<ISpatialProtocolAdapter>> Adapters;

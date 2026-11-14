@@ -10,7 +10,8 @@ void FCustomAdapter::Configure(const FSpatialAdapterConfig& InConfig)
 {
 	Config = InConfig;
 	CachedSendRateHz = InConfig.SendRateHz;
-	LastSentByID.Reset();
+	LastMessages.Reset();
+	TimeSinceLastSend = 0.f;
 	ParseArgTemplate();
 }
 
@@ -22,6 +23,7 @@ void FCustomAdapter::SetClientComponent(USpatialOSCClientComponent* InClient)
 void FCustomAdapter::ParseArgTemplate()
 {
 	CachedArgNames.Empty();
+	bValidTemplate = true;
 	FString Template = Config.CustomArgTemplate.TrimStartAndEnd();
 	if (Template.IsEmpty()) { return; }
 
@@ -32,7 +34,10 @@ void FCustomAdapter::ParseArgTemplate()
 		FString Trimmed = P.TrimStartAndEnd();
 		if (!Trimmed.IsEmpty())
 		{
-			CachedArgNames.Add(Trimmed.ToLower());
+			Trimmed.ToLowerInline();
+			static const TSet<FString> Allowed = {TEXT("x"), TEXT("y"), TEXT("z"), TEXT("gain"), TEXT("width"), TEXT("id"), TEXT("azimuth"), TEXT("a"), TEXT("elevation"), TEXT("e"), TEXT("distance"), TEXT("d")};
+			if (!Allowed.Contains(Trimmed)) bValidTemplate = false;
+			CachedArgNames.Add(Trimmed);
 		}
 	}
 }
@@ -106,7 +111,7 @@ TArray<float> FCustomAdapter::BuildArgs(const FSpatialNormalizedState& State) co
 		const FVector Polar = FSpatialMath::CartesianToPolar(State.StageNormalized);
 		Azimuth = MapRange(Polar.X, -180.f, 180.f, Config.CustomPositionRange.X, Config.CustomPositionRange.Y);
 		Elevation = MapRange(Polar.Y, -90.f, 90.f, Config.CustomPositionRange.X, Config.CustomPositionRange.Y);
-		DistanceNorm = MapRange(FMath::Clamp(Polar.Z / FMath::Sqrt(3.f), 0.f, 1.f), 0.f, 1.f, Config.CustomPositionRange.X, Config.CustomPositionRange.Y);
+		DistanceNorm = MapRange(FMath::Clamp(Polar.Z, 0.0, 1.0), 0.f, 1.f, Config.CustomPositionRange.X, Config.CustomPositionRange.Y);
 	}
 
 	TArray<float> Args;
@@ -125,83 +130,34 @@ TArray<float> FCustomAdapter::BuildArgs(const FSpatialNormalizedState& State) co
 	return Args;
 }
 
-void FCustomAdapter::SendObject(const FSpatialNormalizedState& State)
+TArray<FSpatialOSCMessage> FCustomAdapter::BuildMessages(const FSpatialFrameSnapshot& Snapshot) const
 {
-	if (!Client) { return; }
-
-	const TArray<float> FloatArgs = BuildArgs(State);
-	if (Config.CustomSendMode == ECustomSendMode::Discrete && FloatArgs.Num() > 0)
+	TArray<FSpatialOSCMessage> Result;
+	if (!bValidTemplate) return Result;
+	for (const auto& State : Snapshot.Objects)
 	{
-		for (int32 i = 0; i < FloatArgs.Num(); ++i)
+		const auto Args = BuildArgs(State);
+		if (Config.CustomSendMode == ECustomSendMode::Discrete)
 		{
-			const FString AxisName = GetAxisNameForAddress(CachedArgNames[i]);
-			const FString Addr = ResolveAddress(State, &AxisName);
-			Client->SendMultiArg(Addr, { FloatArgs[i] });
-			if (OnLog)
+			for (int32 i = 0; i < Args.Num(); ++i)
 			{
-				FSpatialFabricLogEntry Entry;
-				Entry.Adapter = TEXT("Custom");
-				Entry.Direction = TEXT("OUT");
-				Entry.Address = Addr;
-				Entry.ValueStr = FString::Printf(TEXT("%.3f"), FloatArgs[i]);
-				FDateTime Now = FDateTime::Now();
-				Entry.Timestamp = FString::Printf(TEXT("%02d:%02d:%02d"), Now.GetHour(), Now.GetMinute(), Now.GetSecond());
-				OnLog(Entry);
+				const FString Axis = GetAxisNameForAddress(CachedArgNames[i]);
+				Result.Add({ResolveAddress(State, &Axis), {Args[i]}, {}, {}});
 			}
 		}
+		else Result.Add({ResolveAddress(State), Args, {}, {}});
 	}
-	else
-	{
-		const FString Address = ResolveAddress(State);
-		if (FloatArgs.Num() > 0)
-		{
-			Client->SendMultiArg(Address, FloatArgs);
-		}
-		else
-		{
-			Client->SendMessage(Address, {}, {}, {});
-		}
-			if (OnLog)
-			{
-		FSpatialFabricLogEntry Entry;
-		Entry.Adapter   = TEXT("Custom");
-		Entry.Direction = TEXT("OUT");
-		Entry.Address   = Address;
-		FString ValStr;
-		for (float V : FloatArgs) { ValStr += FString::Printf(TEXT("%.3f "), V); }
-		Entry.ValueStr  = ValStr.TrimEnd();
-		FDateTime Now = FDateTime::Now();
-		Entry.Timestamp = FString::Printf(TEXT("%02d:%02d:%02d"),
-			Now.GetHour(), Now.GetMinute(), Now.GetSecond());
-		OnLog(Entry);
-			}
-	}
+	Result.RemoveAll([](const FSpatialOSCMessage& Message) { return !Message.IsValid(); });
+	return Result;
 }
 
 void FCustomAdapter::ProcessFrame(const FSpatialFrameSnapshot& Snapshot, float DeltaTime)
 {
-	if (!Config.bEnabled || !Client) { return; }
-	if (!ShouldSendThisFrame(DeltaTime)) { return; }
-
-	Client->Connect(Config.TargetIP, Config.TargetPort); // same shared client as ADM, new destination
-
-	for (const FSpatialNormalizedState& State : Snapshot.Objects)
-	{
-		if (Config.bSendOnlyOnChange)
-		{
-			FCustomCachedState& Cache = LastSentByID.FindOrAdd(State.ObjectID);
-			const bool bPosChanged = !State.StageNormalized.Equals(Cache.PosNorm, UE_KINDA_SMALL_NUMBER);
-			const bool bGainChanged = FMath::Abs(State.GainLinear - Cache.GainLinear) > UE_KINDA_SMALL_NUMBER;
-			const bool bWidthChanged = FMath::Abs(State.Width01 - Cache.Width01) > UE_KINDA_SMALL_NUMBER;
-			if (!bPosChanged && !bGainChanged && !bWidthChanged && Cache.bEverSent)
-			{
-				continue;
-			}
-			Cache.PosNorm = State.StageNormalized;
-			Cache.GainLinear = State.GainLinear;
-			Cache.Width01 = State.Width01;
-			Cache.bEverSent = true;
-		}
-		SendObject(State);
-	}
+	if (!Config.bEnabled || !Client || !ShouldSendThisFrame(DeltaTime)) return;
+	Client->Connect(Config.TargetIP, Config.TargetPort);
+	if (!Client->IsConnected()) { LastMessages.Reset(); return; }
+	const auto Messages = BuildMessages(Snapshot);
+	if (Config.bSendOnlyOnChange && Messages == LastMessages) return;
+	Transmit(Client, Messages);
+	LastMessages = Messages;
 }

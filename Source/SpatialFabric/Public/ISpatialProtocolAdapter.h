@@ -7,6 +7,19 @@
 
 class USpatialOSCClientComponent;
 
+/** Socket-independent encoder output, shared by preview, tests, and transmission. */
+struct SPATIALFABRIC_API FSpatialOSCMessage
+{
+	FString Address;
+	TArray<float> Floats;
+	TArray<int32> Ints;
+	TArray<FString> Strings;
+	bool operator==(const FSpatialOSCMessage& Other) const
+	{ return Address == Other.Address && Floats == Other.Floats && Ints == Other.Ints && Strings == Other.Strings; }
+	FString ToString() const;
+	bool IsValid() const;
+};
+
 /**
  * ISpatialProtocolAdapter
  *
@@ -76,10 +89,13 @@ public:
 	/** Returns true if this adapter is enabled (FSpatialAdapterConfig::bEnabled). */
 	virtual bool IsEnabled() const = 0;
 
+	virtual TArray<FSpatialOSCMessage> BuildMessages(const FSpatialFrameSnapshot& Snapshot) const { return {}; }
+
 	/** Append a log entry to the shared log.  Set by the router after construction. */
 	TFunction<void(const FSpatialFabricLogEntry&)> OnLog;
 
 protected:
+	void Transmit(USpatialOSCClientComponent* Client, const TArray<FSpatialOSCMessage>& Messages);
 	/**
 	 * Rate-limiting helper: returns true only when SendRateHz allows another send.
 	 * DeltaTime is seconds since last *game tick* (not since last send), so we

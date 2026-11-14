@@ -5,6 +5,7 @@
 #include "SpatialFabricEditorModule.h"
 #include "UI/SSpatialFabricPanel.h"
 #include "SpatialFabricManagerActor.h"
+#include "AudioLoomOscSubsystem.h"
 
 #include "Editor.h"
 #include "LevelEditor.h"
@@ -19,6 +20,7 @@
 #define LOCTEXT_NAMESPACE "SpatialFabricEditor"
 
 const FName FSpatialFabricEditorModule::SpatialFabricTabName = TEXT("SpatialFabricPanel");
+static bool GRestorePlaybackOSC = false;
 
 // ─── Editor tickable ──────────────────────────────────────────────────────
 
@@ -34,13 +36,15 @@ public:
 		if (!GEditor || GEditor->PlayWorld) { return; }
 		UWorld* EditorWorld = GEditor->GetEditorWorldContext().World();
 		if (!EditorWorld) { return; }
-
-		ASpatialFabricManagerActor* Manager =
-			ASpatialFabricManagerActor::GetOrSpawnManager(EditorWorld);
-		if (Manager)
+		if (GRestorePlaybackOSC)
 		{
-			Manager->ProcessFrame(DeltaTime);
+			if (auto* Sub = EditorWorld->GetSubsystem<UAudioLoomOscSubsystem>()) Sub->StartListening();
+			GRestorePlaybackOSC = false;
 		}
+
+		// Never mutate a level just because the editor/module is ticking.
+		for (TActorIterator<ASpatialFabricManagerActor> It(EditorWorld); It; ++It)
+			It->ProcessFrame(DeltaTime);
 	}
 
 	virtual TStatId GetStatId() const override
@@ -64,20 +68,36 @@ void FSpatialFabricEditorModule::StartupModule()
 
 	RegisterTab();
 
-	// Ensure manager exists when PIE starts
-	PIEStartedHandle = FEditorDelegates::PostPIEStarted.AddLambda([](bool)
+	// Release editor sockets before PIE duplicates try to bind the same ports.
+	PIEStartedHandle = FEditorDelegates::PreBeginPIE.AddLambda([](bool)
+	{
+		if (!GEditor) return;
+		if (UWorld* World = GEditor->GetEditorWorldContext().World())
+		{
+			for (TActorIterator<ASpatialFabricManagerActor> It(World); It; ++It) It->ShutdownNetworking();
+			if (auto* Sub = World->GetSubsystem<UAudioLoomOscSubsystem>())
+			{ GRestorePlaybackOSC = Sub->IsListening(); Sub->StopListening(); }
+		}
+	});
+	PostPIEHandle = FEditorDelegates::PostPIEStarted.AddLambda([](bool)
+	{
+		if (GRestorePlaybackOSC && GEditor && GEditor->PlayWorld)
+			if (auto* Sub = GEditor->PlayWorld->GetSubsystem<UAudioLoomOscSubsystem>()) Sub->StartListening();
+	});
+	EndPIEHandle = FEditorDelegates::EndPIE.AddLambda([](bool)
 	{
 		if (GEditor && GEditor->PlayWorld)
-		{
-			ASpatialFabricManagerActor::GetOrSpawnManager(GEditor->PlayWorld);
-		}
+			if (auto* Sub = GEditor->PlayWorld->GetSubsystem<UAudioLoomOscSubsystem>())
+			{ GRestorePlaybackOSC = Sub->IsListening(); Sub->StopListening(); }
 	});
 }
 
 void FSpatialFabricEditorModule::ShutdownModule()
 {
 	GEditorTickable.Reset();
-	FEditorDelegates::PostPIEStarted.Remove(PIEStartedHandle);
+	FEditorDelegates::PreBeginPIE.Remove(PIEStartedHandle);
+	FEditorDelegates::PostPIEStarted.Remove(PostPIEHandle);
+	FEditorDelegates::EndPIE.Remove(EndPIEHandle);
 
 	if (FGlobalTabmanager::Get()->HasTabSpawner(SpatialFabricTabName))
 	{

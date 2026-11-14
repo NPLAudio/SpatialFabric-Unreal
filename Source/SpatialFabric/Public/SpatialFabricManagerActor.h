@@ -166,6 +166,13 @@ public:
 	 */
 	void ProcessFrame(float DeltaTime);
 
+	/** Shared permission policy for all manager network entry points. */
+	bool IsNetworkingAllowed() const;
+	void ShutdownNetworking();
+
+	/** Actual per-adapter encoder output, including routing/overrides; no sockets opened. */
+	FString BuildOutputPreview() const;
+
 	/** Get the most recent N log entries (newest last). */
 	UFUNCTION(BlueprintCallable, Category = "SpatialFabric|Log")
 	TArray<FSpatialFabricLogEntry> GetRecentLog(int32 Count = 10) const;
@@ -202,6 +209,11 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaTime) override;
+	virtual void BeginDestroy() override;
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& Event) override;
+	virtual void PostEditUndo() override;
+#endif
 
 private:
 	static constexpr int32 MaxLogEntries = 500;
