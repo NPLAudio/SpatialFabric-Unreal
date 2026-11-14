@@ -1,0 +1,42 @@
+# SpatialFabric documentation
+
+## Pick a workflow
+
+1. **[Getting started](GettingStarted.md)** — installation, first launch, first
+   position patch, first cue, and a pre-show checklist.
+2. **[Spatial routing](SpatialRouting.md)** — stage sizing, object identity,
+   coordinate conversion, ADM/Custom, metadata and listener following.
+3. **[Direct audio](AudioPlayback.md)** — channel patching, devices, preparation,
+   loops/replay, CSV, cooked media and migration.
+4. **[OSC reference](OSCReference.md)** — exact addresses, types, ports, config
+   files, network permissions and an executable sender example.
+5. **[Showcase tour](SpatialSandboxDemo.md)** — prepared example, ten-minute
+   walkthrough, asset refresh and live validation tools.
+6. **[Troubleshooting](Troubleshooting.md)** — silence, wrong channels, missing
+   packets, invisible stage, slow updates, duplicate paths and missing modules.
+7. **[Development](Development.md)** — source builds, portable example creation,
+   automated validation, distribution, editing generated assets and documentation.
+8. **[Codebase guide](CODEBASE_GUIDE.md)** — four modules, runtime data flow,
+   threading/lifetime, source reading order and extension points.
+
+## Ready-made material
+
+- [Playable UE 5.8 source project](../Examples/SpatialFabricShowcase/README.md)
+- [Editable PowerPoint, presenter guide and 10-minute demo](../Presentations/README.md)
+- [Current validation evidence and outstanding release gates](../VALIDATION.md)
+- [Remediation/change summary](../FIXES.md)
+- [Task tracking](../TODO.md)
+
+`AUDIT.md` is a historical pre-remediation report, not a current list of unfixed
+issues and not evidence of platform/hardware certification. Documentation describes
+current implemented behavior; the validation page distinguishes implementation
+from combinations actually exercised.
+
+## Three distinctions to keep on the patch sheet
+
+- A **spatial object ID** is not an **audio output channel**.
+- OSC **position data** is not a stream of PCM **audio samples**.
+- A **successful send/preview** is not proof that the receiver rendered sound.
+
+Write both signal paths down before a rehearsal. Keep levels low while confirming
+physical output assignments and always retain an independent system mute.

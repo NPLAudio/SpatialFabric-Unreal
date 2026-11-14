@@ -1,620 +1,188 @@
 <div align="center">
-  <img src="assets/spatialfabric-unified.png" alt="SpatialFabric — spatial control and AudioLoom direct playback, woven together" width="960"/>
+<img src="assets/spatialfabric-unified.png" alt="SpatialFabric — spatial control and direct playback, woven together" width="960"/>
 </div>
 
-# SpatialFabric [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE) [![Buy Me a Coffee](https://img.shields.io/badge/Buy%20Me%20a%20Coffee-support-yellow?logo=buymeacoffee)](https://buymeacoffee.com/notpunny)
+# SpatialFabric
 
-Spatial audio control and direct audio playback in one Unreal Engine plugin.
-Maps UE actor positions to spatial audio processors via **ADM-OSC** and Custom OSC,
-and includes **AudioLoom** device/channel playback, OSC transport controls, and CSV routing.
-Use **Window → Spatial Fabric** for spatial setup and the new **Playback** tab for audio.
+**Unreal actors as a spatial control surface. SoundWaves as direct-output cues.**
 
-Through ADM-OSC, a single output reaches any compatible spatial audio processor: L-Acoustics
-L-ISA, FLUX:: SPAT Revolution, d&b Soundscape, Meyer Sound SpaceMap Go, TiMax
-SoundHub, and other ADM-OSC–compliant systems.
+SpatialFabric combines ADM-OSC/Custom OSC spatial positioning with AudioLoom
+OS-device/channel playback in one plugin. Open **Window → Spatial Fabric** for
+Stage, Objects, Radar, Output and Playback.
 
-An open-source tool for theatre, concert, and immersive-audio designers who
-need real-time spatial audio positioning from Unreal Engine.
+> **Two independent signal paths:** spatial output sends control data, not audio.
+> Direct playback sends PCM to an OS output device, not automatically to an ADM
+> renderer. Connecting those paths is part of your show-system patch.
 
----
+[MIT license](LICENSE) · [Documentation](Docs/README.md) ·
+[Playable example](Examples/SpatialFabricShowcase/README.md) ·
+[Sound-designer presentation](Presentations/README.md) ·
+[Validation and limits](VALIDATION.md)
 
-## Table of Contents
+## Choose your starting point
 
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Audio Playback & Migration](#audio-playback--migration)
-- [SpatialSandbox Showcase](#spatialsandbox-showcase)
-- [Coordinate Convention](#coordinate-convention)
-- [Feature Overview](#feature-overview)
-- [Supported Protocols](#supported-protocols)
-- [Editor Panel](#editor-panel)
-- [Architecture](#architecture)
-- [Blueprint API](#blueprint-api)
-- [Configuration Reference](#configuration-reference)
-- [Testing](#testing)
-- [License](#license)
+| You want to… | Start here |
+|---|---|
+| Try a ready-made level | [Example setup](Examples/SpatialFabricShowcase/README.md) |
+| Add the plugin to a show/project | [Getting started](Docs/GettingStarted.md) |
+| Send positions to an external renderer | [Spatial routing](Docs/SpatialRouting.md) |
+| Play cues to a device/channel | [Audio playback and CSV](Docs/AudioPlayback.md) |
+| Connect a controller or inspect packets | [OSC reference](Docs/OSCReference.md) |
+| Find out why something is silent/invisible | [Troubleshooting](Docs/Troubleshooting.md) |
+| Build, test or extend the code | [Development](Docs/Development.md) and [codebase guide](Docs/CODEBASE_GUIDE.md) |
+| Present the system to sound designers | [15-minute talk + 10-minute demo](Presentations/README.md) |
 
----
+## Requirements and honest support status
 
-## Requirements
+- **Validated engine/platform: UE 5.8 on Win64.** Build against your installed engine.
+- Windows native builds require Visual Studio 2022 C++ tools, a compatible Windows
+  SDK and .NET Framework SDK; see [build instructions](Docs/Development.md).
+- Runtime dependency: Unreal's built-in **OSC** plugin. This repository contains
+  one `SpatialFabric.uplugin` and four retained runtime/editor modules.
+- The example is a small **C++ project** with its own walking character. It does not
+  require Epic's FirstPerson character/animation content or any sample download.
+- Optional editor regeneration tools require Python Editor Script Plugin,
+  Editor Scripting Utilities and Sequencer Scripting; the example enables them.
+- WASAPI is implemented for Windows; Core Audio is implemented for macOS, but Mac
+  compilation/device behavior is **not certified by the Windows results**.
+  No Linux direct-device playback certification is claimed.
 
-| Requirement | Version |
-|-------------|---------|
-| Unreal Engine | **5.8 validated on Win64**; other versions/platforms require native validation |
-| Visual Studio | 2022 (Windows) or Xcode 15+ (macOS) |
-| UE Plugin | **OSC** (built-in, must be enabled) |
+Native Editor/Development/Shipping compilation does **not** certify physical audio
+channels, exclusive mode, latency, all interfaces, or cooked codec playback.
+See [remaining release gates](VALIDATION.md).
 
-SpatialFabric includes its own `USpatialOSCClientComponent` and
-`USpatialOSCServerComponent`, using UE OSC message/client types and an exact-bind
-UDP receiver. **2.0.1** avoids UE 5.8's loopback-to-LAN address rewrite and checks
-real socket binding rather than proxy existence. Receive input is bounded IPv4
-unicast OSC; see [receiver policy](Docs/SpatialSandboxDemo.md#osc-endpoints).
-No additional runtime plugins are required beyond OSC. Direct playback backends
-are implemented for **Windows and macOS** (macOS still requires native validation);
-PCM playback is independent of ADM-OSC positioning.
+The plugin-only release ZIP intentionally omits the example and deck. Use the
+complete GitHub repository for those files, or the companion example ZIP when a
+release provides it. Release automation is configured to attach the example/deck;
+a push to main alone does not create a release or version tag.
 
----
+## Install into your project
 
-## Installation
+1. Back up the project and close Unreal. If upgrading AudioLoom, remove its
+   standalone plugin and `.uproject` entry; do not load duplicate module names.
+2. Place this repository at `YourProject/Plugins/SpatialFabric`.
+3. Enable **SpatialFabric** and **OSC**, then regenerate/build your project's
+   Editor target with the supported toolchain. Source releases do not include
+   engine-independent ready-to-use DLLs.
+4. Open the project and **Window → Spatial Fabric**.
 
-### Option A — Copy into an existing project
+The legacy `/Script/AudioLoom` module/class identities remain for existing
+Blueprints, assets and C++ callers. Read the [migration checklist](Docs/AudioPlayback.md#migration-from-standalone-audioloom--spatialfabric-1x)
+for intentional OSC-address, listener and cooked-loading changes.
 
-1. **Download or clone** this repository:
+## Run the published example
 
-   ```bash
-   git clone https://github.com/NPLAudio/SpatialFabric.git
-   ```
+The actual `.umap`, `.uasset` files, original WAV sources, configuration and small
+walking-character source are checked in under **`Examples/SpatialFabricShowcase`**.
+No symlink, local sandbox folder, MCP server, or external sample library is needed.
 
-2. **Copy the plugin** into your project's `Plugins/` folder:
+From this repository root:
 
-   ```
-   YourProject/
-   └── Plugins/
-       └── SpatialFabric/
-   ```
-
-3. **Enable the built-in OSC plugin** (dependency):
-   - Open your project in the Unreal Editor.
-   - Edit → Plugins → search **"OSC"** → enable → restart when prompted.
-
-4. **Enable SpatialFabric**:
-   - Edit → Plugins → search **"SpatialFabric"** → enable → restart the editor.
-
-5. **Verify** by opening Window → **Spatial Fabric**. The panel should appear
-   with Stage, Objects, Radar, Output, and Playback tabs.
-
-### Option B — Add to an existing .uproject manually
-
-Add these entries to the `Plugins` array in your `.uproject` file:
-
-```json
-{
-  "Plugins": [
-    { "Name": "OSC", "Enabled": true },
-    { "Name": "SpatialFabric", "Enabled": true }
-  ]
-}
+```powershell
+python Tools/prepare_example.py --destination C:/dev/SpatialFabricShowcase
 ```
 
-Then copy the `SpatialFabric/` folder into your `Plugins/` directory and
-regenerate project files.
+This creates a standalone source project with a project-local plugin. It refuses
+nonempty destinations. Build/open `C:/dev/SpatialFabricShowcase/SpatialFabricShowcase.uproject`,
+then press Play: **WASD + mouse**, **Space** to jump, **Shift+F1** for editor controls.
+The level includes a surrounding collision floor and perimeter barriers.
+**Audio is manual-start and quiet**; choose a safe output before pressing Play.
 
-### Option C — Build from source
+Follow the [10-minute tour](Docs/SpatialSandboxDemo.md). The repository project can
+also reference the plugin through `AdditionalPluginDirectories`; preparing a
+standalone copy is recommended when moving or distributing the example.
 
-```batch
-"C:\Program Files\Epic Games\UE_5.8\Engine\Build\BatchFiles\Build.bat" ^
-    YourProjectEditor Win64 Development ^
-    -Project="C:\path\to\YourProject.uproject" -WaitMutex -FromMsBuild
+## First spatial patch
+
+1. In the Stage tab, explicitly spawn a Manager if none is present; assign/spawn
+   a Stage Volume. Merely opening the plugin must not add actors to your map.
+2. Match the stage box to the area and set its physical dimensions in meters.
+3. Select an actor, then **Objects → + Add Selected Actors**. Give it a positive
+   object ID and the intended adapter target.
+4. Set the destination IP/port. Newly constructed managers enable ADM-OSC on
+   loopback `50018`; Custom is initially disabled. Review defaults before a show.
+5. Read **Output**, then verify actual incoming UDP in your receiver. A preview
+   or successful UDP send is not an acknowledgement from an audio processor.
+
+The five-tab workflow, coordinate conventions, per-target IDs, metadata, listener
+following and Custom templates are covered in [Spatial routing](Docs/SpatialRouting.md).
+
+## First direct-audio patch
+
+1. Add an **Audio Loom** actor/component and assign a supported SoundWave.
+2. Choose the intended OS output device. Empty device ID means default output;
+   a missing explicitly selected endpoint fails rather than playing elsewhere.
+3. Channel **0** maps source channels to corresponding device channels. Channel
+   **1..N** sends the **first source channel** to just that physical output.
+4. Press Play/Stop. Prepare Audio can predecode before timing-critical cues.
+
+There is no automatic downmix, multichannel duplication, spatial panning,
+Unreal submix processing or renderer patch created by these steps.
+See [playback policy](Docs/AudioPlayback.md) before using show media.
+
+## Ports, permissions and safety
+
+| Purpose | Default |
+|---|---|
+| ADM position/metadata destination | `127.0.0.1:50018` |
+| Spatial numeric feedback listener | `127.0.0.1:8100` |
+| Playback command listener, started on request | `127.0.0.1:9000` |
+| Playback worker-state monitoring destination | `127.0.0.1:9001` |
+| Extra Custom destination in the example only | `127.0.0.1:9002` |
+
+Spatial settings live in **`Config/DefaultSpatialFabric.ini`**; playback OSC
+settings live in **`Config/DefaultEngine.ini`**. These are separate permission
+switches. Packaged networking is opt-in for each. Loopback binds remain loopback;
+IPv4 unicast receivers verify real socket binding and reject malformed input.
+OSC is unauthenticated. Remote control requires an explicit trusted-network and
+firewall decision. The shipped example does **not** enable editor MCP.
+
+## Backend, in sound-design terms
+
+Think of the spatial path as a moving control surface: actors are tracked sources,
+the stage is the measurement frame, bindings are the object patch, and the renderer
+receives position/width/gain/mute messages. Think of direct playback as a separate
+cue player patched straight to an interface. A buffering worker keeps audio moving
+while the editor draws the next frame; that separation does not make the entire
+system sample-accurate or remove driver, converter and network delays.
+
+The [presentation](Presentations/README.md) explains the complete path with diagrams,
+timed speaker notes, a ten-minute demo and Q&A prompts.
+
+## Validation
+
+```sh
+python -m unittest discover -s Tools -p "test_*.py"
+python Tools/validate_unreal.py --engine "C:/Program Files/Epic Games/UE_5.8"
 ```
 
-Adjust the UE path and target name to match your installation.
-
-Other 5.x installs require their own native compatibility/build verification;
-use the matching engine path and do not infer support from the UE 5.8 result.
-
-### Dependency summary
-
-```
-SpatialFabric
-├── OSC (UE built-in plugin)
-├── Sockets / Networking (UE modules)
-└── DeveloperSettings (UE module — for Project Settings integration)
-```
-
----
-
-## Quick Start
-
-1. **Open the Spatial Fabric panel**:
-   - In the Unreal Editor, go to Window → **Spatial Fabric**.
-   - Use this panel as the main setup and monitoring surface after the plugin
-     is installed.
-
-2. **Create or locate the Manager Actor**:
-   - If the level does not already contain a **Spatial Fabric Manager**, the
-     panel shows a warning banner at the top.
-   - Click **Spawn Manager Actor** from that banner to create and select it.
-
-3. **Create the Stage Volume from the panel**:
-   - In the **Stage** tab, click **Spawn Stage Volume in Level**. If a stage
-     volume already exists, the same control lets you select and assign it.
-   - Scale and position the box to match your physical audio space.
-   - Set **Physical Width/Depth/Height (meters)** in the Details panel to match
-     real-world dimensions.
-
-4. **Add object bindings**:
-   - In the **Objects** tab, click **+ Add Selected Actors**.
-   - Pick the actor you want to track and assign an Object ID.
-   - The actor's position will now be tracked relative to the Stage Volume.
-
-5. **Enable an output adapter**:
-   - In the **Objects** tab (or the Manager's Details panel), enable
-     **ADM-OSC** (for any ADM-OSC–compatible spatial audio processor) or another adapter.
-   - Set the **Target IP** and **Port** for your audio system.
-
-6. **Press Play** (or use the editor panel in edit mode) and verify output
-   with a tool like [Protokol](https://hexler.net/protokol) or your audio
-   system's OSC monitor.
-
-### Protokol not receiving?
-
-1. **Check permissions and manager** — spatial preview/output works in editor or PIE when a placed Manager exists and Enable In Editor is on. Packaged networking requires opt-in.
-2. **Protokol receive port** — Add an OSC Input in Protokol that **receives/listens** on port **50018** (default). Unreal sends TO this port; Protokol must bind to it.
-3. **Target IP** — Ensure the Manager sends to `127.0.0.1` if Protokol is on the same machine.
-4. **Objects bound** — You must have at least one object bound with the ADM-OSC target enabled. Use **+ Add Selected Actors** in the Objects tab.
-5. **Enable Debug Messages** — Project Settings → Plugins → Spatial Fabric → Enable Debug Messages to see OSC connect/disconnect in the Output Log.
-
----
-
-## Audio Playback & Migration
-
-AudioLoom is now included in SpatialFabric. Install **only SpatialFabric**, not both
-plugins: the combined plugin preserves AudioLoom's module/class names for existing
-Blueprints, assets, and C++ callers.
-
-- Open **Window → Spatial Fabric**, then **Playback**.
-- Add an **Audio Loom** actor/component, assign a SoundWave, and choose device/channel.
-- Configure playback OSC in **Project Settings → Plugins → Spatial Fabric Playback OSC**.
-- Existing `/audioloom/...` OSC addresses and Engine config sections are unchanged.
-- Spatial OSC and playback OSC remain independent; a spatial manager is not needed
-  for direct playback.
-
-See [Audio playback setup, limitations, and migration](Docs/AudioPlayback.md) before
-upgrading an existing AudioLoom project. This is a packaging/UI consolidation;
-the safety/routing fixes and validation status are tracked in [FIXES.md](FIXES.md).
-Review the intentional v2 OSC, listener, and cooked-audio migration changes in the guide.
-
----
-
-## SpatialSandbox Showcase
-
-A generated laboratory level demonstrates animated spatial objects, simultaneous
-ADM/Custom ID routes, virtual listener following, and three manual-start playback
-stations. No third-party asset downloads are required.
-
-Open `/Game/SpatialFabricDemo/Maps/L_SpatialFabric_Showcase` in the local
-SpatialSandbox project. The map is sandbox content, not included in this plugin's
-source ZIP; the reproducible builder is in `Tools/Unreal/`.
-See the [tour, OSC endpoints, provenance and live checks](Docs/SpatialSandboxDemo.md).
-
----
-
-## Coordinate Convention
-
-SpatialFabric uses the **audience / listener perspective** (house left/right),
-which aligns with UE's native axis orientation:
-
-```
-        +X (front / toward audience)
-         ↑
-  -Y ←── ● ──→ +Y (house right)
-         ↓
-        -X (back / upstage)
-
-  +Z = up
-  -Z = down
-```
-
-| Axis | Direction | UE Equivalent |
-|------|-----------|---------------|
-| **+X** | Front (downstage / toward audience) | Forward |
-| **-X** | Back (upstage) | Backward |
-| **+Y** | House right (audience's right) | Right |
-| **-Y** | House left (audience's left) | Left |
-| **+Z** | Up (fly space) | Up |
-| **-Z** | Down | Down |
-
-All positions are **normalized to [-1, 1]** relative to the Stage Volume.
-Adapters that use different conventions (e.g., ADM-OSC's left-positive azimuth)
-handle the conversion internally at the point of send.
-
----
-
-## Feature Overview
-
-### Stage Volume
-
-A box-shaped actor that defines the physical coordinate space. All tracked
-actor positions are **normalized to [-1, 1]** relative to this volume — an
-actor at the center maps to (0, 0, 0), an actor at the +X face maps to
-(1, 0, 0). Positions outside the box are clamped.
-
-- **Physical dimensions** (meters) for coordinate scaling
-- **Axis flip** (X/Y/Z) checkboxes for convention overrides
-- **Listener actor** (optional) shifts the coordinate origin to a player pawn,
-  camera, or any actor — enables binaural/head-tracked output
-- **Listener-relative orientation** rotates axes to follow the listener's facing
-  direction (useful for head-tracked binaural rendering)
-- **Auto-follow player** checkbox for zero-code listener tracking
-
-### Object Bindings
-
-Each binding maps one UE actor to one or more protocol targets:
-
-| Property | Description |
-|----------|-------------|
-| **Target Actor** | The actor whose position is tracked |
-| **Object ID** | Protocol channel/object number (>= 1) |
-| **Label** | Display name (falls back to actor label) |
-| **Gain** | Linear amplitude multiplier [0-2] |
-| **Width / Spread** | Object spread [0-1] |
-| **Muted** | Suppress output for this object |
-| **ADM Dref / Dmax** | Distance reference parameters (ADM-OSC only) |
-| **Adapter Targets** | Per-binding adapter type overrides and per-target ObjectID overrides |
-| **CustomFields** | Key-value pairs for Custom adapter placeholders (e.g. `slot`, `channel`) |
-
-> **Custom adapter** bindings support
-> CustomFields for template placeholders like `{slot}` and `{channel}`.
-
-### Multi-Protocol Output
-
-All adapters run simultaneously — the Manager Actor fans each frame's
-snapshot to every enabled adapter through the Protocol Router.
-
-### Rate Limiting and Transmit-on-Change
-
-Each adapter has a configurable **Send Rate (Hz)** (default 50 Hz, range 1-120)
-in the Objects tab. Messages are only sent when the rate limiter allows,
-preventing network saturation on high-framerate systems.
-
-**Only when changed:** When enabled, the adapter sends full state on level
-start, then only when coordinates (and gain/width/mute) change. Reduces
-network traffic when objects are static.
-
-### Editor Panel
-
-A dockable Slate panel with five tabs for configuration, playback, and live monitoring
-without requiring Play mode. **ADM-OSC** is shown by default in the Objects
-tab; ADM-OSC and Custom are available in the Manager Actor's
-Details panel for advanced use.
-
----
-
-## Supported Protocols
-
-### ADM-OSC
-
-[ADM-OSC](https://adm-osc.github.io/ADM-OSC/) is the open standard for
-object-based audio positioning over OSC ([spec on GitHub](https://github.com/immersive-audio-live/ADM-OSC)).
-A single ADM-OSC output from SpatialFabric works with any compliant spatial audio processor:
-
-| System | Vendor | Documentation |
-|--------|--------|---------------|
-| [L-ISA Controller](https://www.l-acoustics.com/products/l-isa-controller/) | L-Acoustics | [L-ISA OSC Protocol](https://l-isa-immersive.com/en/tech-resources/) |
-| [SPAT Revolution](https://www.flux.audio/project/spat-revolution/) | FLUX:: | [SPAT Revolution OSC](https://doc.flux.audio/spat-revolution/) |
-| [Soundscape / DS100](https://www.dbaudio.com/global/en/products/signal-processors/ds100/) | d&b audiotechnik | [DS100 OSC Protocol](https://www.dbaudio.com/global/en/service/documentation/) |
-| [SpaceMap Go](https://meyersound.com/product/spacemap-go/) | Meyer Sound | [SpaceMap Go OSC](https://meyersound.com/product/spacemap-go/) |
-| [TiMax SoundHub](https://thetimaxgroup.com/timax-soundhub/) | TiMax | [TiMax OSC Reference](https://thetimaxgroup.com/resources/) |
-| [Space Controller](https://www.spacecontroller.com/) | Sound Particles | [Space Controller Docs](https://www.soundparticles.com/products/spacecontroller) |
-
-ADM-OSC sends position, gain, spread, mute, label, and optional distance
-parameters per object, plus listener position and orientation for binaural
-head-tracking.
-
-| OSC Address | Values | Description |
-|-------------|--------|-------------|
-| `/adm/obj/{n}/xyz` | x y z | Cartesian position [-1, 1] (Y negated on wire — ADM convention is left-positive) |
-| `/adm/obj/{n}/aed` | azimuth elevation distance | Polar position (azimuth: 0°=front, +left) |
-| `/adm/obj/{n}/gain` | linear | Object gain |
-| `/adm/obj/{n}/w` | 0-1 | Object width/spread |
-| `/adm/obj/{n}/mute` | 0/1 | Mute state |
-| `/adm/obj/{n}/name` | string | Object label |
-| `/adm/obj/{n}/dref` | 0-1 | Distance reference |
-| `/adm/obj/{n}/dmax` | meters | Max distance |
-| `/adm/lis/xyz` | x y z | Listener position |
-| `/adm/lis/ypr` | yaw pitch roll | Listener orientation |
-
-**Default port:** 50018 (en-bridge)
-**Recommended send rate:** ≤ 50 Hz (per ADM-OSC spec)
-
-### Custom (Template)
-
-The **Custom** adapter sends OSC using user-defined address and argument
-templates. Use it for systems that don't follow ADM-OSC or other built-in
-protocols.
-
-| Setting | Description |
-|---------|-------------|
-| **Coords** | **xyz** = Cartesian (x, y, z); **aed** = polar (azimuth, elevation, distance) |
-| **Send** | **Bundled** = one message with multiple args; **Discrete** = one message per value |
-| **Address** | OSC path template with `{placeholders}` |
-| **Args** | Space-separated arg names: `x y z gain width id` (xyz) or `a e d` (aed) |
-| **Range** | Map position [-1..1], gain [0..1], width [0..1] to custom output ranges |
-
-**Placeholders:** `{id}`, `{x}`, `{y}`, `{z}`, `{gain}`, `{width}`, `{label}`,
-`{axis}` (discrete mode only — replaced with current axis name, e.g. `/source/{id}/{axis}` → `/source/1/x`).
-Add per-binding **CustomFields** for `{slot}`, `{channel}`, etc.
-
-**AED arg names:** `azimuth`/`a`, `elevation`/`e`, `distance`/`d`.
-
-### Custom Adapter
-
-The **Custom** adapter is available from the Manager Actor's Details panel and
-the Objects tab format selector.
-
-Use it when you need template-based OSC output instead of one of the built-in
-protocol-specific adapters.
-
-| Setting | Description |
-|---------|-------------|
-| **Address** | OSC path template with `{placeholders}` |
-| **Args** | Space-separated arg names such as `x y z gain width id` |
-| **Coords** | `xyz` for Cartesian or `aed` for polar coordinates |
-| **Send** | Bundled or discrete message sending |
-| **Range** | Output remapping for position, gain, and width values |
-
----
-
-## Editor Panel
-
-Open via Window → **Spatial Fabric**. The panel has five tabs:
-
-| Tab | Purpose |
-|-----|---------|
-| **Stage** | Stage Volume assignment, physical dimensions, listener config |
-| **Objects** | Add/remove object bindings, set Object IDs, format selector (ADM-OSC, Custom) |
-| **Radar** | Live 2D top-down visualization with aspect-correct stage coordinates (front=top, right=right) |
-| **Output** | Preview from the actual routed encoders and scrolling message log |
-| **Playback** | Direct audio device/channel playback, OSC transport, and routing CSV |
-
-**Objects tab:** The format selector (ADM-OSC, Custom) switches the
-active adapter. The **Rate (Hz)** control sets the polling limit (1–120 Hz);
-**Only when changed** compares encoded packets, including metadata and address changes.
-When **Custom** is selected, a template section appears with coordinate mode
-(xyz/aed), send mode (bundled/discrete), address and args templates, and range
-mapping. Each object row has an **enable checkbox** and a **delete icon** to
-remove the binding.
-
-The panel works in **editor mode** (no PIE required) — an editor tickable
-drives `ProcessFrame()` so you see live data while placing actors.
-
-> **Adapter-specific** fields (ADM-OSC gain/mute/name, Custom template) show
-> options in each binding row when that format is active.
-
----
-
-## Architecture
-
-**Learning the C++ side?** See **[Docs/CODEBASE_GUIDE.md](Docs/CODEBASE_GUIDE.md)** for a reading order, glossary, and how data flows each frame (plus file-top comments in the sources).
-
-### Module Layout
-
-```
-Plugins/SpatialFabric/
-├── SpatialFabric.uplugin
-├── README.md
-├── LICENSE
-└── Source/
-    ├── SpatialFabric/                   # Runtime module
-    │   ├── SpatialFabric.Build.cs
-    │   ├── Public/
-    │   │   ├── SpatialFabricTypes.h             — All structs and enums
-    │   │   ├── SpatialFabricSettings.h          — Project Settings defaults
-    │   │   ├── SpatialFabricManagerActor.h      — Central level actor
-    │   │   ├── SpatialStageVolume.h             — Bounding box + coordinate transform
-    │   │   ├── SpatialObjectRegistry.h          — Builds per-frame snapshot
-    │   │   ├── ISpatialProtocolAdapter.h        — Adapter interface + rate limiter
-    │   │   ├── ProtocolRouter.h                 — Fan-out to all adapters
-    │   │   ├── SpatialMath.h                    — Coordinate transform utilities
-    │   │   ├── SpatialOSCClientComponent.h      — Sends OSC UDP (wraps UE OSC plugin)
-    │   │   ├── SpatialOSCServerComponent.h      — Receives exact-bind OSC UDP
-    │   │   └── Adapters/
-    │   │       ├── ADMOSCAdapter.h              — ADM-OSC v1.0 (L-ISA, etc.)
-    │   │       └── CustomAdapter.h               — Template-based OSC (xyz/aed, bundled/discrete)
-    │   └── Private/
-    │       ├── SpatialFabricManagerActor.cpp
-    │       ├── SpatialStageVolume.cpp
-    │       ├── SpatialObjectRegistry.cpp
-    │       ├── SpatialMath.cpp
-    │       ├── ProtocolRouter.cpp
-    │       ├── SpatialOSCClientComponent.cpp
-    │       ├── SpatialOSCServerComponent.cpp
-    │       ├── SpatialFabricModule.cpp
-    │       ├── SpatialFabricSettings.cpp
-    │       ├── Adapters/
-    │       │   ├── ADMOSCAdapter.cpp
-    │       │   └── CustomAdapter.cpp
-    │       └── Tests/
-    │           └── SpatialFabricTests.cpp       — 5 automation tests
-    │
-    └── SpatialFabricEditor/             # Editor-only module
-        ├── SpatialFabricEditor.Build.cs
-        ├── Public/
-        │   ├── SpatialFabricEditorModule.h
-        │   └── UI/
-        │       └── SSpatialFabricPanel.h        — Dockable Slate panel (4 tabs)
-        └── Private/
-            ├── SpatialFabricEditorModule.cpp
-            └── UI/
-                └── SSpatialFabricPanel.cpp
-```
-
-### Runtime Components
-
-| Class | Role |
-|-------|------|
-| `ASpatialFabricManagerActor` | Central level actor; owns all components and drives the frame loop |
-| `ASpatialStageVolume` | Defines coordinate space; normalizes world positions to [-1, 1] |
-| `USpatialObjectRegistry` | Reads actor positions each tick; builds `FSpatialFrameSnapshot` |
-| `FProtocolRouter` | Fans snapshot to all enabled adapters; filters per-adapter object subsets |
-| `ISpatialProtocolAdapter` | Pure interface all adapters implement; includes rate limiter |
-| `USpatialOSCClientComponent` | Sends outgoing OSC UDP via UE's built-in OSC plugin |
-| `USpatialOSCServerComponent` | Receives bounded OSC UDP on the exact configured IPv4 interface |
-
-### Data Flow
-
-```
-Each tick:
-  ASpatialStageVolume::ResolveListenerThisFrame()
-    → cache listener position/rotation
-    → use a virtual listener-relative basis (never move the authored stage actor)
-
-  USpatialObjectRegistry::BuildSnapshot(Bindings, StageVolume)
-    → resolve soft actor pointers (with cached label fallback)
-    → read world transforms
-    → normalize to stage volume [-1, 1]
-    → compute physical meters
-    → produce FSpatialFrameSnapshot
-
-  FProtocolRouter::ProcessFrame(Snapshot, Bindings, DeltaTime)
-    → for each enabled adapter:
-        FilterSnapshotForAdapter()  → slice per-adapter subset, resolve ObjectIDs
-        Adapter::ProcessFrame()     → format protocol messages and send
-```
-
-### Adapter Wire Convention Handling
-
-The internal coordinate system uses +Y = right (audience perspective).
-Each adapter converts to its wire format at the point of send:
-
-| Adapter | Wire Convention | Conversion |
-|---------|----------------|------------|
-| ADM-OSC Cartesian | +Y = left | Negate Y |
-| ADM-OSC Polar | Azimuth +left (CCW) | Negate Y before atan2 |
-| Custom | User-defined (xyz or aed, bundled or discrete) | Per template / range mapping |
-
-### Module Dependencies
-
-```
-SpatialFabric (runtime):
-    Core, CoreUObject, Engine, OSC, Sockets, Networking, DeveloperSettings,
-    Slate, SlateCore, InputCore
-
-SpatialFabricEditor (editor-only):
-    SpatialFabric, EditorSubsystem, PropertyEditor, UnrealEd,
-    LevelEditor, EditorStyle, OSC, WorkspaceMenuStructure
-```
-
----
-
-## Blueprint API
-
-| Node | Description |
-|------|-------------|
-| `GetOrSpawnManager` | Find or spawn the ASpatialFabricManagerActor in the current world |
-| `StartServer` / `StopServer` | Start/stop the OSC receive server |
-| `ConnectClient` / `DisconnectClient` | Open/close the shared OSC send socket |
-| `ProcessFrame` | Manually drive one spatial frame (normally called by Tick) |
-| `InitializeAdapters` | Re-create all adapters from current config (safe at runtime) |
-| `GetRecentLog` | Retrieve recent protocol log entries |
-| `WorldToNormalized` | Convert a world position to stage-normalized [-1, 1] coordinates |
-| `WorldToMeters` | Convert a world position to physical meters relative to stage origin |
-| `AssignListenerToPlayerPawn` | Set the player pawn as the listener actor |
-| `AssignListenerToPlayerCamera` | Set the player camera as the listener actor |
-| `ClearListener` | Remove listener assignment (revert to stage-fixed mode) |
-
----
-
-## Configuration Reference
-
-### Project Settings
-
-Accessible via Project Settings → Plugins → **Spatial Fabric**:
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| `bEnableInEditor` | `true` | Enable networking in the editor |
-| `bEnableInPackagedBuilds` | `false` | Enable networking in shipped builds |
-| `DefaultOSCListenPort` | `8100` | Incoming OSC port |
-| `DefaultADMOSCPort` | `50018` | ADM-OSC default send port (en-bridge) |
-| `DefaultSendRateHz` | `50.0` | Default adapter send rate (Hz) |
-
-### Per-Adapter Configuration
-
-Each adapter entry in `AdapterConfigs` on the Manager Actor supports:
-
-| Field | Description |
-|-------|-------------|
-| `TargetIP` | Destination IP address |
-| `TargetPort` | Destination UDP port |
-| `SendRateHz` | Per-adapter rate limit (1-120 Hz) |
-| `bSendOnlyOnChange` | When true, send only when coordinates/gain/width/mute change (full state on start) |
-| `bEnabled` | Enable/disable this adapter |
-| `ADMCoordinateMode` | Cartesian / Polar / Both (ADM-OSC only) |
-| `CustomCoordinateMode` | xyz (Cartesian) or aed (polar) — Custom adapter |
-| `CustomSendMode` | Bundled or Discrete — Custom adapter |
-| `CustomAddressTemplate` | OSC path with `{placeholders}` — Custom adapter |
-| `CustomArgTemplate` | Space-separated arg names — Custom adapter |
-| `CustomPositionRange` / `CustomGainRange` / `CustomWidthRange` | Output range (min, max) — Custom adapter |
-
----
-
-## Testing
-
-### Automation Tests
-
-SpatialFabric includes 5 UE automation tests (run via Session Frontend →
-Automation → SpatialFabric):
-
-| # | Test | Description |
-|---|------|-------------|
-| 1 | `Math.Center` | Object at stage center → normalized (0, 0, 0) |
-| 2 | `Math.Corner` | Corner positions, clamping, meter conversion |
-| 3 | `Adapters.ADMOSCAddress` | ADM-OSC address format and value range validation |
-| 4 | `Math.ListenerRelative` | Listener-relative coordinate transform (no rotation) |
-| 5 | `Math.ListenerRelativeRotated` | Listener-relative with yaw rotation (Y-axis sign) |
-
-### Recommended External Tools
-
-| Tool | Use Case |
-|------|----------|
-| [Protokol](https://hexler.net/protokol) (free) | General-purpose OSC monitor |
-| [python-osc](https://pypi.org/project/python-osc/) | Scripted testing and CI |
-| [L-ISA Controller](https://www.l-acoustics.com/) (free offline) | ADM-OSC visual verification |
-
----
-
-## Known Limitations
-
-- **One shared OSC client** per Manager Actor — adapters reconnect the client
-  to their endpoint before each send. For truly simultaneous multi-IP output,
-  place multiple Manager Actors in the level.
-- **Networking is disabled in packaged builds** by default. Set
-  `bEnableInPackagedBuilds = true` in Project Settings or DefaultEngine.ini.
-  A warning is logged to the Output Log when networking is skipped.
-- **All adapters disabled by default** — enable per-show in the Manager Actor's
-  AdapterConfigs map. The Objects tab shows a hint and **Enable** button when
-  the active adapter is disabled.
-
----
-
-## Support
-
-If SpatialFabric is useful to you, consider
-[buying me a coffee](https://buymeacoffee.com/notpunny).
-
----
-
-## License
-
-MIT License — see [LICENSE](LICENSE) for full text.
-
-Copyright (c) 2026 SpatialFabric Contributors.
-
-### Trademark Notice
-
-L-Acoustics, L-ISA, FLUX::, SPAT Revolution, d&b, Soundscape, Meyer Sound,
-SpaceMap Go, TiMax, SoundHub, Sound Particles, and Space Controller are the
-property of their respective owners. SpatialFabric is an independent plugin and
-is not affiliated with, endorsed by, or sponsored by those manufacturers.
+The native runner builds disposable copies and judges Unreal's JSON report, not
+exit code alone. Current evidence includes **26 native regressions**, Win64
+Editor/Development/Shipping builds, live editor/PIE checks and real UDP capture.
+The published example has separate compilation and silent PIE smoke coverage.
+Exact commands, evidence and exclusions are in [VALIDATION.md](VALIDATION.md).
+
+## Repository map
+
+- `Source/SpatialFabric`, `SpatialFabricEditor`: spatial pipeline and editor UI.
+- `Source/AudioLoom`, `AudioLoomEditor`: direct playback and retained legacy identity.
+- `Source/Shared`: exact-bind, bounded OSC input shared without a module cycle.
+- `Examples/SpatialFabricShowcase`: runnable example assets/project/source audio.
+- `Tools`: validation, preparation, branding and editor automation.
+- `Docs`: current operator/developer guides; `AUDIT.md` is a **historical pre-fix** report.
+- `Presentations`: editable deck, presenter guide and demo run sheet.
+
+## License and support
+
+Plugin/example/tool source is MIT; see [LICENSE](LICENSE). Original AudioLoom
+notices remain in [ThirdParty/AudioLoom/LICENSE](ThirdParty/AudioLoom/LICENSE).
+Original artwork provenance is in [assets/README.md](assets/README.md).
+The example references Unreal Engine basic content; that content remains governed
+by Epic's applicable terms, not this repository's MIT license.
+
+External manufacturers' trademarks belong to their owners. No manufacturer
+endorsement, processor compatibility certification or hardware approval is implied.
+For processor deployment, confirm the exact firmware, address set, coordinate and
+object-numbering requirements with its documentation and a real receiver test.
+
+If this project helps your work, consider [buying me a coffee](https://buymeacoffee.com/notpunny).

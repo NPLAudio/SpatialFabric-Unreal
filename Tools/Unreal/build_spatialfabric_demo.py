@@ -4,13 +4,16 @@ Writes only generated /Game/SpatialFabricDemo assets/tagged actors, project
 SourceAssets/SpatialFabricDemo audio, and Saved/SpatialFabricDemo reports.
 No third-party downloads: engine primitives + project template + locally generated audio.
 """
+import importlib.util
 import json
 import math
 from pathlib import Path
-import struct
 import traceback
-import wave
 import unreal
+
+_audio_spec = importlib.util.spec_from_file_location("spatialfabric_demo_audio", Path(__file__).with_name("demo_audio.py"))
+AUDIO = importlib.util.module_from_spec(_audio_spec)
+_audio_spec.loader.exec_module(AUDIO)
 
 ROOT = "/Game/SpatialFabricDemo"
 MAP = ROOT + "/Maps/L_SpatialFabric_Showcase"
@@ -108,28 +111,11 @@ def import_file(filename, destination):
     return unreal.load_asset(paths[0])
 
 
-def audio_asset(name, duration, stereo=False, frequency=440):
+def audio_asset(name, kind):
     folder = Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_dir())) / "SourceAssets/SpatialFabricDemo/Audio"
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / (name + ".wav")
-    rate = 48000
-    samples = bytearray()
-    for i in range(round(duration * rate)):
-        t = i / rate
-        env = min(1.0, t / 0.025, (duration - t) / 0.15)
-        if stereo:
-            slot = int(t) % 2
-            left = math.sin(2 * math.pi * 440 * t) * (0.06 if slot == 0 else 0.005)
-            right = math.sin(2 * math.pi * 660 * t) * (0.06 if slot == 1 else 0.005)
-            samples.extend(struct.pack("<hh", int(32767 * env * left), int(32767 * env * right)))
-        else:
-            value = (math.sin(2 * math.pi * frequency * t) + 0.2 * math.sin(2 * math.pi * frequency * 2 * t)) * 0.05
-            samples.extend(struct.pack("<h", int(32767 * env * value)))
-    with wave.open(str(path), "wb") as out:
-        out.setnchannels(2 if stereo else 1)
-        out.setsampwidth(2)
-        out.setframerate(rate)
-        out.writeframes(samples)
+    REPORT.setdefault("audio_designs", []).append(AUDIO.write_wav(path, kind))
     asset = import_file(path, ROOT + "/Audio")
     setp(asset, "loading_behavior", unreal.SoundWaveLoadingBehavior.FORCE_INLINE)
     unreal.EditorAssetLibrary.save_loaded_asset(asset)
@@ -163,6 +149,11 @@ def build():
     colors = [(0.025, 0.48, 1.0), (0.55, 0.04, 1.0), (1.0, 0.25, 0.025), (0.1, 0.8, 0.35)]
     glows = [material("M_SF_Glow_" + str(i + 1), c, 0.25, 0.3, 2.2) for i, c in enumerate(colors)]
     grid = material("M_SF_Grid", (0.04, 0.14, 0.23), 0.2, 0.5, 0.8)
+    # A continuous foundation catches players stepping/jumping off the display deck.
+    mesh("Safety Floor 120x120m", "Cube", (0, 0, -50), (120, 120, 0.6), panel, collision=True)
+    for edge in (-5980, 5980):
+        mesh("Safety Wall X " + str(edge), "Cube", (edge, 0, 155), (0.3, 120, 3.5), charcoal, collision=True)
+        mesh("Safety Wall Y " + str(edge), "Cube", (0, edge, 155), (120, 0.3, 3.5), charcoal, collision=True)
     mesh("Main Stage 20x15m", "Cube", (0, 0, -15), (20, 15, 0.3), charcoal, collision=True)
     mesh("Welcome Deck", "Cube", (-1750, 0, -15), (15, 24, 0.3), panel, collision=True)
     mesh("Brand Backwall", "Cube", (1260, 0, 550), (0.3, 24, 11), charcoal, collision=True)
@@ -182,7 +173,7 @@ def build():
     text("Right axis", "+Y  HOUSE RIGHT", (0, 670, 8), 32, rot=(90, 0, 0))
     text("Left axis", "-Y  HOUSE LEFT", (0, -670, 8), 32, rot=(90, 0, 0))
 
-    banner_path = Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_plugins_dir())) / "SpatialFabric/assets/spatialfabric-unified.png"
+    banner_path = Path(__file__).resolve().parents[2] / "assets/spatialfabric-unified.png"
     banner = import_file(banner_path, ROOT + "/Textures")
     banner_mat_path = ROOT + "/Materials/M_SF_Banner"
     banner_mat = unreal.load_asset(banner_mat_path) if unreal.EditorAssetLibrary.does_asset_exist(banner_mat_path) else ASSETS.create_asset("M_SF_Banner", ROOT + "/Materials", unreal.Material, unreal.MaterialFactoryNew())
@@ -281,8 +272,8 @@ def build():
     playback.set_editor_property("playback_settings", settings)
     REPORT["steps"].append("30-second looping motion sequence (autoplay in PIE)")
 
-    sounds = [audio_asset("SW_SF_MonoCue", 1.2), audio_asset("SW_SF_StereoLoop", 4.0, True), audio_asset("SW_SF_ReplayCue", 0.6, frequency=330)]
-    names = ["ONE-SHOT / CH 1", "STEREO LOOP / ALL", "AUTO REPLAY / CH 2"]
+    sounds = [audio_asset("SW_SF_MonoCue", "impact"), audio_asset("SW_SF_StereoLoop", "groove"), audio_asset("SW_SF_ReplayCue", "glass")]
+    names = ["IMPACT / CH 1", "STEREO GROOVE / ALL", "GLASS CUE / CH 2"]
     osc = ["/demo/playback/mono", "/demo/playback/stereo", "/demo/playback/replay"]
     for i, y in enumerate((-650, 0, 650)):
         x = -1640

@@ -48,7 +48,7 @@ confined to this plugin; AudioLoom's module/class identities remain compatible.
 - Windows resource/error handling is explicit. macOS callbacks validate float32 layouts,
   pre-zero all output, resample at the stream rate, avoid callback allocation/logging,
   bound buffer capacity, detect stalls, and allow Stop to interrupt the final drain.
-- Version is now 2.0.1. `Docs/AudioPlayback.md` documents changed descendant addresses,
+- Version is now 2.0.2. `Docs/AudioPlayback.md` documents changed descendant addresses,
   virtual listener following, ADM unit-sphere coordinates, cooked Force Inline policy,
   fail-closed device routes, loopback defaults, and independent network permissions.
 
@@ -69,9 +69,42 @@ core-ticker callback lifetime. The core ticker keeps control reception independe
 of world pause/realtime viewport ticking; callbacks may safely stop/release a receiver.
 
 The reproducible showcase builder, independent UDP capture and live checks are in
-`Tools/Unreal/`; see `Docs/SpatialSandboxDemo.md`. Sandbox binary assets stay outside
-the plugin Git repository. Existing engine primitives and generated test tones
-were sufficient; no third-party asset downloads were needed.
+`Tools/Unreal/`; see `Docs/SpatialSandboxDemo.md`. The working sandbox remains independent;
+a reviewed map/media snapshot is now published under `Examples/SpatialFabricShowcase`.
+Existing engine primitives and original procedural sound designs were sufficient;
+no third-party asset downloads were needed.
+
+## Showcase usability follow-up
+
+The stage box's inherited HiddenInGame flag also hid it in editor Game View, while
+ApplyStageVisibility previously did nothing in editor worlds. Visibility now restores
+actor/component display and selection-independent box drawing in the editor; the
+hide setting applies only to PIE/game. A production regression covers both worlds
+and confirms that hiding/showing never changes the authored stage transform.
+
+The showcase now has a continuous 120 × 120 m collision floor with 3.5 m perimeter
+barriers. A focused updater checks five floor and four boundary traces. The rejected
+cinematic sweep was replaced with a warmer percussion hit; routing/durations remain
+unchanged. These sandbox changes do not modify the existing FirstPerson map.
+
+## 2.0.2 publication and documentation
+
+The published example contains real map/assets, matching original WAV sources,
+reviewed minimal configuration, a hashed inventory and original walking-character
+source. It deliberately excludes the large Epic FirstPerson content dependency,
+local credentials, editor MCP services and generated binaries/caches. A bounded
+preparation tool produces a standalone project-local plugin copy without recursion.
+
+Operator guides were reorganized around installation, spatial routing, direct audio,
+CSV, exact OSC/types/config files, troubleshooting and development. Obsolete claims
+about Cartesian axis conversion, mono channel-0 duplication, disabled-by-default ADM,
+Blueprint availability and per-frame socket allocation were corrected. Historical
+AUDIT.md remains explicitly pre-fix, not a current certification claim.
+
+An editable 16-slide sound-designer PowerPoint, PDF, notes and run sheet explain
+15 minutes of backend discussion, a separate ten-minute demonstration and open Q&A.
+Plugin-only release packaging excludes the example/deck; companion source-example
+and presentation attachments are configured separately.
 
 ## Validation status and limits
 
@@ -81,9 +114,13 @@ macOS/Linux, older Unreal releases, or the full interactive editor workflow. Tho
 are intentionally explicit rather than marked complete based on a successful compile.
 
 Latest native run: **UE 5.8 Win64 Editor, Development, Shipping builds succeeded;
-25 native tests passed, zero failed/skipped**. The Python layout/branding/result-runner/
-demo-tooling suite also passes (14 checks). Native evidence is retained locally in
-`SpatialFabricValidation-5gg8mmdf`. The production source matches that native build.
+26 native tests passed, zero failed/skipped**. The Python layout/branding/result-runner/
+demo/distribution suite also passes (22 checks). Native evidence is retained locally in
+`SpatialFabricValidation-7d4mvdvu`. The production source matches that native build.
+The standalone example additionally built and passed ten silent PIE checks in
+`SpatialFabricExampleValidation-4iee9ojt`; its outer floor and perimeter were exercised
+with the actual walking pawn/capsule, not only visibility traces. The deck was opened
+and rendered in Microsoft PowerPoint with 16 notes-bearing slides and a PDF export.
 
 A live SpatialSandbox run additionally passed 24 PIE checks (including paused-world OSC play/stop) and five post-PIE
 handoff/restoration checks. Independent UDP capture recorded 15,458 messages with

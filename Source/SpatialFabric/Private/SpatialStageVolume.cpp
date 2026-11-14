@@ -26,6 +26,8 @@ ASpatialStageVolume::ASpatialStageVolume()
 	StageBox->SetCollisionProfileName(FName("NoCollision"));
 	StageBox->SetGenerateOverlapEvents(false);
 	StageBox->SetLineThickness(2.f);
+	StageBox->SetHiddenInGame(false);
+	StageBox->bDrawOnlyIfSelected = false;
 	RootComponent = StageBox;
 }
 

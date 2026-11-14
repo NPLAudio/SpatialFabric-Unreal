@@ -346,16 +346,19 @@ void ASpatialFabricManagerActor::ApplyStageVisibility()
 	if (!SV) { SV = ResolveStageVolumeForThisWorld(); }
 	if (!IsValid(SV)) { return; }
 
-	// Only apply in game worlds (PIE or packaged); editor viewport is unaffected
-	if (GetWorld() && GetWorld()->IsGameWorld())
+	// The PIE option must not hide the authored volume in the editor, including Game View.
+	// UBoxComponent defaults to HiddenInGame, which otherwise makes an unchecked toggle
+	// look broken whenever the editor viewport has Game View enabled.
+	const bool bHide = GetWorld() && GetWorld()->IsGameWorld() && bHideStageInPIE;
+	SV->SetActorHiddenInGame(bHide);
+	SV->SetHideDebugDraw(bHide);
+	if (SV->StageBox)
 	{
-		SV->SetActorHiddenInGame(bHideStageInPIE);
-		SV->SetHideDebugDraw(bHideStageInPIE);
-		// Hide the box component's wireframe outline (UBoxComponent draws bounds as lines)
-		if (SV->StageBox)
+		SV->StageBox->SetHiddenInGame(bHide);
+		SV->StageBox->SetVisibility(!bHide);
+		if (SV->StageBox->bDrawOnlyIfSelected)
 		{
-			SV->StageBox->SetHiddenInGame(bHideStageInPIE);
-			SV->StageBox->bDrawOnlyIfSelected = bHideStageInPIE;
+			SV->StageBox->bDrawOnlyIfSelected = false;
 			SV->StageBox->MarkRenderStateDirty();
 		}
 	}

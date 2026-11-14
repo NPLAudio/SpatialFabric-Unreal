@@ -1,0 +1,130 @@
+{
+  "engine": "UE 5.8",
+  "map": "/Game/SpatialFabricDemo/Maps/L_SpatialFabric_Showcase",
+  "files": [
+    {
+      "path": "Content/SpatialFabricDemo/Audio/SW_SF_MonoCue.uasset",
+      "bytes": 17849,
+      "sha256": "64fe5fd477ce524ad405ce9cb29ecc5bcd1e833bd23aebb4c75d5c986b70eecd"
+    },
+    {
+      "path": "Content/SpatialFabricDemo/Audio/SW_SF_ReplayCue.uasset",
+      "bytes": 24655,
+      "sha256": "4eb66e7ca67dd1b571b9499d82fff233189bc913fc8a31ef7687942ab9ffc495"
+    },
+    {
+      "path": "Content/SpatialFabricDemo/Audio/SW_SF_StereoLoop.uasset",
+      "bytes": 260696,
+      "sha256": "6fba121390f0bcd7808fbd7dfc183b6f2f8da536be7af5112945b575b656d350"
+    },
+    {
+      "path": "Content/SpatialFabricDemo/Maps/L_SpatialFabric_Showcase.umap",
+      "bytes": 246290,
+      "sha256": "fd8ae4535d401916bfe2c80bd4e1a67bbd657fb763bd01b32d06a50a3919145e"
+    },
+    {
+      "path": "Content/SpatialFabricDemo/Materials/M_SF_Banner.uasset",
+      "bytes": 14148,
+      "sha256": "cdf38e4608fa03fa969afa2b9402e14e81b3461a72a738bd12dee8e8c9d02e4b"
+    },
+    {
+      "path": "Content/SpatialFabricDemo/Materials/M_SF_Charcoal.uasset",
+      "bytes": 10630,
+      "sha256": "4ad604e58eee1d78885b499151294e8247f105b965f1d3ca93bdcf57e54e8192"
+    },
+    {
+      "path": "Content/SpatialFabricDemo/Materials/M_SF_Driver.uasset",
+      "bytes": 10357,
+      "sha256": "2996f3453c3014742d9077338766d0064ea07847290ab49c602272c5ff734ed3"
+    },
+    {
+      "path": "Content/SpatialFabricDemo/Materials/M_SF_Glow_1.uasset",
+      "bytes": 11135,
+      "sha256": "75c1d0c753bc2be78038f041edd34d558aa325d326d638acefc1c011e0aaf59b"
+    },
+    {
+      "path": "Content/SpatialFabricDemo/Materials/M_SF_Glow_2.uasset",
+      "bytes": 11001,
+      "sha256": "7b6432dc6ea49ccc36132b217527392a0a5b94e9b4195397639bf68804d82aac"
+    },
+    {
+      "path": "Content/SpatialFabricDemo/Materials/M_SF_Glow_3.uasset",
+      "bytes": 11028,
+      "sha256": "227a102f106bce67fb56002774fa31b6df7c58303b778ee6b5082d3dc9f0d943"
+    },
+    {
+      "path": "Content/SpatialFabricDemo/Materials/M_SF_Glow_4.uasset",
+      "bytes": 10878,
+      "sha256": "863f941e8c67af2fa9cb7da85baf68e42a6114e1553c0bd50b264029a43b736b"
+    },
+    {
+      "path": "Content/SpatialFabricDemo/Materials/M_SF_Grid.uasset",
+      "bytes": 10599,
+      "sha256": "3e380beea44f6dd58eb3ba8dc1038545ad0b5914746e75c3dc872149a5f98cb4"
+    },
+    {
+      "path": "Content/SpatialFabricDemo/Materials/M_SF_Panel.uasset",
+      "bytes": 10384,
+      "sha256": "cd9f4aa437421607e919358d6e56da61c17c1cd04f4beaf11fd798e3ec8d520a"
+    },
+    {
+      "path": "Content/SpatialFabricDemo/Sequences/LS_SpatialFabric_Motion.uasset",
+      "bytes": 43341,
+      "sha256": "7cb2b250342795079d5440e1a16ac9e30cfe2fbfe0298044cca1d6b4d5b83a59"
+    },
+    {
+      "path": "Content/SpatialFabricDemo/Textures/spatialfabric-unified.uasset",
+      "bytes": 398036,
+      "sha256": "3e5d18e2089dbd394da36d60104c4c184bab04d19ba889e36bb483e472f0fe80"
+    },
+    {
+      "path": "SourceAssets/SpatialFabricDemo/Audio/SW_SF_MonoCue.wav",
+      "bytes": 115244,
+      "sha256": "1d9cf57e486de674c9c8318bd9328331fe4441c1e6349367e079a258a56acf15"
+    },
+    {
+      "path": "SourceAssets/SpatialFabricDemo/Audio/SW_SF_ReplayCue.wav",
+      "bytes": 57644,
+      "sha256": "1455e1f6b42a8fec49451f0f2be7b37d99941f2a2b3ab39900c5b8ac771a275d"
+    },
+    {
+      "path": "SourceAssets/SpatialFabricDemo/Audio/SW_SF_StereoLoop.wav",
+      "bytes": 768044,
+      "sha256": "05a13315a713c693823eec5b37f97e8e9828ca00d82458d72decc794a5112721"
+    }
+  ],
+  "project_package_dependencies": [
+    "/Game/SpatialFabricDemo/Audio/SW_SF_MonoCue",
+    "/Game/SpatialFabricDemo/Audio/SW_SF_ReplayCue",
+    "/Game/SpatialFabricDemo/Audio/SW_SF_StereoLoop",
+    "/Game/SpatialFabricDemo/Maps/L_SpatialFabric_Showcase",
+    "/Game/SpatialFabricDemo/Materials/M_SF_Banner",
+    "/Game/SpatialFabricDemo/Materials/M_SF_Charcoal",
+    "/Game/SpatialFabricDemo/Materials/M_SF_Driver",
+    "/Game/SpatialFabricDemo/Materials/M_SF_Glow_1",
+    "/Game/SpatialFabricDemo/Materials/M_SF_Glow_2",
+    "/Game/SpatialFabricDemo/Materials/M_SF_Glow_3",
+    "/Game/SpatialFabricDemo/Materials/M_SF_Glow_4",
+    "/Game/SpatialFabricDemo/Materials/M_SF_Grid",
+    "/Game/SpatialFabricDemo/Materials/M_SF_Panel",
+    "/Game/SpatialFabricDemo/Sequences/LS_SpatialFabric_Motion",
+    "/Game/SpatialFabricDemo/Textures/spatialfabric-unified"
+  ],
+  "engine_and_script_dependencies": [
+    "/Engine/BasicShapes/Cube",
+    "/Engine/BasicShapes/Cylinder",
+    "/Engine/BasicShapes/Plane",
+    "/Engine/BasicShapes/Sphere",
+    "/Engine/EditorResources/LightIcons/S_LightError",
+    "/Engine/EngineMaterials/WorldGridMaterial",
+    "/Script/AudioLoom",
+    "/Script/Engine",
+    "/Script/InterchangeEngine",
+    "/Script/LevelSequence",
+    "/Script/MovieScene",
+    "/Script/MovieSceneTracks",
+    "/Script/NavigationSystem",
+    "/Script/SpatialFabric"
+  ],
+  "provenance": "See ASSET_LICENSES.md; no external recordings or FirstPerson character packages included."
+}

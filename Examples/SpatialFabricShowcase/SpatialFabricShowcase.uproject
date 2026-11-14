@@ -1,0 +1,18 @@
+{
+  "FileVersion": 3,
+  "EngineAssociation": "5.8",
+  "Category": "Audio",
+  "Description": "SpatialFabric spatial-control and direct-playback showcase",
+  "AdditionalPluginDirectories": ["../.."],
+  "Modules": [{"Name": "SpatialFabricShowcase", "Type": "Runtime", "LoadingPhase": "Default"}],
+  "Plugins": [
+    {"Name": "SpatialFabric", "Enabled": true},
+    {"Name": "OSC", "Enabled": true},
+    {"Name": "PythonScriptPlugin", "Enabled": true, "TargetAllowList": ["Editor"]},
+    {"Name": "EditorScriptingUtilities", "Enabled": true, "TargetAllowList": ["Editor"]},
+    {"Name": "SequencerScripting", "Enabled": true, "TargetAllowList": ["Editor"]},
+    {"Name": "ModelContextProtocol", "Enabled": false},
+    {"Name": "MCPClientToolset", "Enabled": false},
+    {"Name": "AllToolsets", "Enabled": false}
+  ]
+}

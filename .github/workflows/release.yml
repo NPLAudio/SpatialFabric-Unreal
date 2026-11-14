@@ -18,7 +18,7 @@ on:
       version:
         description: 'Release version (e.g. 1.0.0)'
         required: true
-        default: '1.0.0'
+        default: '2.0.2'
 
 permissions:
   contents: write
@@ -71,6 +71,10 @@ jobs:
             --exclude='Binaries' \
             --exclude='Intermediate' \
             --exclude='Saved' \
+            --exclude='DerivedDataCache' \
+            --exclude='Examples' \
+            --exclude='Presentations' \
+            --exclude='.pi' \
             --exclude='*.pdb' \
             --exclude='.DS_Store' \
             . dist/${PLUGIN_DIR}/
@@ -80,10 +84,22 @@ jobs:
           echo "ZIP_PATH=dist/SpatialFabric-${RELEASE_NAME}.zip" >> $GITHUB_ENV
           echo "ZIP_NAME=SpatialFabric-${RELEASE_NAME}.zip" >> $GITHUB_ENV
 
+      - name: Create standalone source example zip
+        env:
+          RELEASE_NAME: ${{ steps.version.outputs.name }}
+        run: |
+          python3 Tools/prepare_example.py --destination "$RUNNER_TEMP/SpatialFabricShowcase"
+          cd "$RUNNER_TEMP"
+          zip -qr "$GITHUB_WORKSPACE/dist/SpatialFabric-Example-${RELEASE_NAME}.zip" SpatialFabricShowcase
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ env.ZIP_PATH }}
+          files: |
+            ${{ env.ZIP_PATH }}
+            dist/SpatialFabric-Example-${{ steps.version.outputs.name }}.zip
+            Presentations/SpatialFabric_From_Cue_to_Space.pptx
+            Presentations/SpatialFabric_From_Cue_to_Space.pdf
           name: Release ${{ steps.version.outputs.name }}
           body: |
             ## SpatialFabric ${{ steps.version.outputs.name }}
@@ -102,8 +118,17 @@ jobs:
 
             ### Requirements
 
-            - Unreal Engine 5.x
-            - OSC plugin (bundled with UE5)
+            - UE 5.8 Win64 is the validated native combination; other combinations need their own validation
+            - OSC plugin (bundled with UE)
+            - Matching C++ toolchain; both ZIPs are source distributions
+
+            ### Example and presentation
+
+            The Example ZIP contains the playable showcase source project and its project-local plugin.
+            Build/open its SpatialFabricShowcase.uproject; audio is manual-start and quiet.
+            The editable PowerPoint and PDF cover a 15-minute sound-designer talk, a separate
+            10-minute demo and Q&A. The full repository includes speaker notes and a demo run sheet.
+            Physical audio/latency and actual cooked-codec certification remain separate release gates.
           tag_name: ${{ steps.version.outputs.tag }}
           draft: false
           generate_release_notes: true

@@ -1,111 +1,173 @@
-![SpatialFabric and AudioLoom, woven together](../assets/spatialfabric-unified.png)
+![SpatialFabric / AudioLoom](../assets/spatialfabric-unified.png)
 
-# SpatialFabric 2 audio playback
+# Direct audio playback, routing and migration
 
-Install and enable **SpatialFabric** and the built-in **OSC** plugin only. Do not
-also install standalone AudioLoom: it defines the same Unreal modules/classes.
+[Documentation index](README.md) · [OSC reference](OSCReference.md) · [Troubleshooting](Troubleshooting.md)
 
-## Setup
+## A cue player, not Unreal's spatial audio mixer
 
-1. Open **Window → Spatial Fabric**, then select **Playback**.
-2. Place an **Audio Loom** actor, or add an **Audio Loom** component to an actor.
-   Legacy class/display names remain to preserve serialized assets and Blueprints.
-3. Assign a SoundWave, output device, and channel. Channel `0` maps corresponding
-   source/device channels; `1..N` routes the first source channel to one output.
-4. Use Play/Stop, Blueprint transport functions, or OSC triggers.
+Place an **Audio Loom** actor or add its component, assign a SoundWave, and use
+**Window → Spatial Fabric → Playback**. Legacy AudioLoom class/display names are
+intentional: serialized `/Script/AudioLoom` references remain valid.
 
-Playback uses WASAPI on Windows and Core Audio on macOS, outside Unreal's mixer.
-It does **not** automatically spatialize PCM when the same actor is routed to ADM.
-A Spatial Fabric Manager and Stage Volume are not required for direct playback.
+PCM goes directly to WASAPI on Windows or the implemented Core Audio backend on
+macOS. It does not automatically traverse Unreal AudioComponent attenuation,
+SoundClass/submix processing or the external ADM renderer. A spatial Manager,
+Stage Volume, or OSC server is not required to play a cue locally.
 
-## Assets, limits, and packaged playback
+Mac code requires its own native/device validation; Windows results are not Mac
+certification. Linux direct-device playback is not certified.
 
-- In editor, imported PCM is decoded and cached per component/asset. Call
-  **Prepare Audio** before timing-critical cues to pay the first decode cost ahead
-  of time. First decoding is synchronous; repeats reuse the cache. Reimport and
-  sound-property changes invalidate it.
-- Packaged SoundWaves must use **Loading Behavior → Force Inline**, then be recooked.
-  Inline cooked data is decoded through Unreal's registered codec factory. Streaming
-  assets are explicitly rejected; the plugin does not block waiting on streaming chunks
-  or silently search for a sibling WAV. Keep a referenced asset in cooked content.
-- Multichannel Vorbis-order data is rejected rather than silently assigning the wrong
-  physical channels. Use PCM/ADPCM or another supported device-order codec for that case.
-- WAV parsing supports little-endian PCM16/24/32 and float32, including validated
-  extensible headers with full-width valid bits. It checks RIFF boundaries, padding,
-  whole frames, finite samples, rates (8–384 kHz), and channels (1–64).
-- Decoded float PCM is capped at 256 MiB per component. Large files should be split;
-  this is not an unlimited streaming player. `Get Last Playback Error` reports backend
-  failures; decode-policy failures are also logged with the asset name.
+## Patch channels deliberately
 
-## Device behavior
+| Setting | Actual behavior |
+|---|---|
+| Device ID empty | Open the OS default output endpoint |
+| Explicit Device ID | Open that endpoint or fail; no silent default fallback |
+| OutputChannel `0` | Source channel 1 → device channel 1, source 2 → device 2, etc. |
+| OutputChannel `1..N` | Route **source channel 1 only** to that one device channel |
 
-- PCM is interpolated at the **actual device rate**, not assumed to be 48 kHz.
-- Windows supports negotiated float32 and integer16/24/32 (including valid-bit packing).
-  Unsupported encodings/layouts fail with a diagnostic.
-- Output channel must exist in the opened device mix layout; the dropdown describes
-  that layout rather than an unrelated exclusive-mode capability probe.
-- Missing explicitly selected devices **fail closed**. An empty device ID alone selects
-  the default endpoint. Do not depend on silent fallback after disconnecting an interface.
-- Windows exclusive initialization may fall back to shared mode. Windows one-shots
-  drain queued frames before natural completion. Stop is an explicit cancellation.
-- Loop changes propagate to active streams. Explicit Stop cancels pending auto-replay;
-  zero replay delay is supported. EndPlay and component unregistration stop/join workers.
-- Play/stop monitoring comes from actual worker stream events, including natural
-  completion/failure after a successful start, rather than unconditional Play requests.
-- macOS validates float32 virtual stream formats and consistent stream rates. Other
-  encodings are rejected. Real Mac device/layout testing remains required.
+Unmapped device channels are zeroed. If the device exposes fewer channels than
+the source, corresponding mapping does not create extra physical outputs. There
+is no automatic downmix or mono broadcast. Selecting output 2 on a stereo source
+routes its **left/first channel to output 2**, not its right channel. Use an
+appropriate mono file when extracting one source for an isolated speaker.
 
-## OSC configuration
+The dropdown describes the opened/mix layout, not an unrelated exclusive-mode
+capability list. Confirm numbering against real interface outputs at low level.
+A device ID is host/driver specific; a routing CSV copied between machines needs
+review. Default output can change with an OS preference or newly connected device.
 
-**Project Settings → Plugins → Spatial Fabric Playback OSC**:
+## Transport and preparation
 
-- Listen IP: **127.0.0.1**, port `9000` by default; the server starts on request.
-- Enable In Editor: true; Enable In Packaged Builds: **false** until explicitly enabled.
-- Monitoring: `127.0.0.1:9001` by default. Active clients pick up destination changes.
-- Set Listen IP to `0.0.0.0` only for a trusted/firewalled remote control network.
-  OSC has no authentication. Do not share the spatial server's receive port.
+- **Play** stops a prior instance/pending replay, prepares/caches PCM, then requests
+  asynchronous stream initialization. Check actual playing state/error, not merely
+  that the request function returned.
+- **Prepare Audio** decodes before a timing-critical cue. First decode is synchronous;
+  repeats share immutable cached PCM. Reimport/asset edits invalidate the cache.
+- **Stop** cancels playback and any pending auto-replay, including zero-delay cases.
+- **Loop** updates the active stream. Turning it off allows natural completion and
+  queued-tail drain rather than requesting an abrupt transport Stop.
+- **Auto Replay** applies after natural completion when Loop is off. Delay can be
+  fixed or random; random min/max are sanitized. Delays use component/world ticking,
+  not a sample-clock cue scheduler. World pause can pause replay timing even though
+  OS audio and core-ticker OSC control are separate.
+- **Begin Play**/autoplay is opt-in. It is off on all example stations.
+- **EndPlay / unregister** stop and join the backend; deleting actors/ending PIE
+  should not leave an orphaned playback worker.
 
-Commands: `<base>/play` (address-only, float >=0.5, or integer >=1), `<base>/stop`,
-and `<base>/loop` (1/0). Outgoing `<base>/state` is float 1/0 for actual playback.
-Registries refresh without an editor panel; address changes also invalidate immediately.
-The editor module transfers an active playback listener across editor/PIE transitions.
+Useful reflected functions: `Play`, `Stop`, `PrepareAudio`, `SetLoop`, `GetLoop`,
+`IsPlaying`, `GetLastPlaybackError`, `GetOutputLatencyMs`, `SetDeviceId`,
+`SetOutputChannel`, `GetOscAddress`, `SetOscAddress`, `UpdateTickEnabled`.
+Routing/playback properties are also exposed for editor/Blueprint use. Do not infer
+Blueprint availability for every public C++ helper in the source.
 
-Spatial positioning remains independent: its default loopback listen port is `8100`,
-and ADM output is `50018`. Its permissions are in Spatial Fabric project settings.
+## Format and memory policy
 
-**2.0.1** uses an exact-bind receiver rather than UE 5.8's stock loopback-to-LAN
-rewrite. Bind failures are real socket failures, and unregister closes immediately.
-Input is bounded IPv4 unicast OSC (`i/f/s/b/h/T/F`); unsupported or malformed
-messages are rejected. See the [showcase tour and live checks](SpatialSandboxDemo.md).
+Editor imports are decoded from the SoundWave's imported data. WAV parsing supports
+little-endian PCM16/24/32 and float32, including validated extensible full-width
+formats, chunk padding, complete interleaved frames, finite samples, 8–384 kHz and
+1–64 channels. Unsupported encodings such as arbitrary float64 are not silently
+reinterpreted. Decoded float PCM is capped at **256 MiB per component**; this is an
+in-memory cue player, not unlimited long-form streaming.
+
+PCM is interpolated at the actual output-device rate to preserve duration/pitch
+across source/device-rate differences. Windows writes negotiated float32 or
+integer16/24/32, including valid-bit packing, and rejects unsupported formats.
+Mac code checks float32 virtual layouts/consistent rates and pre-zeroes callback
+buffers; native Mac compilation/device/layout testing is still a release gate.
+
+## Packaged/cooked SoundWaves
+
+1. Reference/include each required SoundWave in the packaged content.
+2. Set **Loading Behavior → Force Inline** and recook after changing it.
+3. Confirm the chosen cooked codec has a decoder registered in that build.
+4. Run the actual packaged project and verify duration, channel order and error handling.
+
+Streaming chunks are rejected instead of blocking/spinning while waiting for IO.
+The plugin does not silently search for a sibling source WAV in a packaged build.
+Multichannel Vorbis ordering is explicitly rejected rather than assigning channels
+incorrectly. A supported device-order codec such as PCM/ADPCM is preferable for
+that use, subject to your real codec/package test. Compilation of Shipping code
+alone is not proof that your media cooked/decoded correctly.
+
+## Latency, exclusive mode and diagnostics
+
+Exclusive mode is a Windows request, not a universal promise; initialization can
+fall back to shared mode. A buffer-size request is not the entire end-to-end delay.
+First decode, OS device start, output queue, driver/converter and downstream routing
+all contribute. The reported estimate can be **0 when unavailable**; never advertise
+that as measured zero latency. Use appropriate audio-loopback/capture measurement.
+
+`GetLastPlaybackError` distinguishes decode-policy/backend failures. Monitoring
+comes from actual worker start/stop events, not unconditional Play requests.
+Natural EOF drains queued frames; a failed explicit-device request must not quietly
+play elsewhere. Independent hardware listening/capture, disconnect, exclusive-mode,
+rate/layout and latency verification remain in [VALIDATION.md](../VALIDATION.md).
+
+## OSC control and monitoring
+
+Playback has its own **Start OSC / Stop OSC**, listen port and monitoring destination.
+Defaults: incoming `127.0.0.1:9000`, state destination `127.0.0.1:9001`.
+Configuration remains in `DefaultEngine.ini` under
+`[/Script/AudioLoom.AudioLoomOscSettings]`.
+
+Use `<base>/play` (no args, float >=0.5 or int32 >=1), `<base>/stop`, and numeric
+`<base>/loop` (0/1). `<base>/state` is an outgoing float 1/0 lifecycle message,
+not an acknowledgement that an audience heard a sound. Active listener ownership
+is transferred between editor and PIE, then restored. Core-ticker command reception
+works while the game is paused; this does not turn replay timing into a sample clock.
+See [complete wire types and default-address rules](OSCReference.md#playback-transport).
+
+## Routing CSV: export first, then edit
+
+The current export header is:
+
+```csv
+ActorName,ActorLabel,ComponentName,ComponentIndex,SoundWave,DeviceId,OutputChannel,OscAddress,OscBase,OscPlay,OscStop,OscLoop,OscState
+```
+
+- Export the **actual current world** first; internal ActorName and ComponentName
+  are not necessarily the labels displayed in the Outliner.
+- ActorName is required; ActorLabel further disambiguates. ComponentName selects
+  a specific component; a blank name falls back to the zero-based ComponentIndex
+  in name-sorted component order. Legacy 6/7-column layouts remain supported.
+- SoundWave is an Unreal object path, not a filesystem WAV path. Empty clears it.
+  A bad nonempty asset path skips the row rather than substituting another file.
+- Empty DeviceId chooses default; OutputChannel must be an integer 0..64 and still
+  must exist on the real device. Strict numeric parsing rejects malformed values.
+- OscAddress is the **override**. A blank override resets to a derived default;
+  OscBase/Play/Stop/Loop/State are resolved reference columns, not separate endpoints.
+- Quoted commas, doubled quotes and multiline fields are supported. Preserve
+  proper CSV quoting instead of manually splitting on commas/newlines.
+- Import is transactional for valid edits, but **not an all-or-nothing file commit**:
+  invalid records can be skipped; an invalid OSC override can be reported while
+  valid routing columns apply. Read every warning and re-export to verify.
+- CSV is a routing snapshot, not a copy of audio media, drivers, device calibration,
+  every transport property, or the spatial object-binding table.
+
+Back up/export before bulk changes; test undo/redo on a disposable copy and inspect
+the active world after PIE retargeting. Do not use a CSV as a substitute for a show
+patch sheet and asset/version inventory.
 
 ## Migration from standalone AudioLoom / SpatialFabric 1.x
 
-1. Close Unreal, back up the project, and remove standalone `Plugins/AudioLoom`
-   (including engine-level copies). Remove its `.uproject` plugin entry.
-2. Install combined `Plugins/SpatialFabric`; enable SpatialFabric and OSC.
-3. Clear stale generated Binaries/Intermediate as appropriate and rebuild.
-4. Review receive IP/permissions, cooked Loading Behavior, and OSC addresses below.
+1. Close Unreal and back up the project. Remove standalone `Plugins/AudioLoom`
+   and engine-level duplicates, including its `.uproject` plugin entry.
+2. Install only the combined SpatialFabric plugin and enable OSC.
+3. Remove stale generated binaries/intermediates only as appropriate, regenerate
+   project files and rebuild against the chosen engine. Do not delete source media.
+4. Inspect default receive IP, packaged permissions, explicit device routes,
+   cooked Loading Behavior, resolved OSC paths and physical channel assignments.
 
-`AudioLoom`/`AudioLoomEditor` module names, `/Script/AudioLoom` class paths, C++ module
-references, CSV columns, and `[/Script/AudioLoom.AudioLoomOscSettings]` in Engine config
-remain unchanged; no class redirects are needed. The hidden legacy `AudioLoomPanel`
-tab is retained for saved layouts/C++ callers.
+Retained: `AudioLoom`/`AudioLoomEditor` module names, `/Script/AudioLoom` classes,
+Engine config section, CSV columns, legacy hidden `AudioLoomPanel` tab. No class
+redirect is needed for that packaging consolidation.
 
-**Intentional v2 behavior changes:**
+Intentional changes: descendants gain an owner-name OSC path segment; default
+receivers bind loopback; packaged networking requires separate opt-ins; missing
+devices fail closed; ADM XYZ/AED share a unit-sphere point; listener following
+uses a virtual basis; format switching retains target/custom-field data. These
+changes can require updating external show-control files even when assets load.
 
-- Root-owned components keep `/audioloom/<root-label>/<index>` defaults. Descendant
-  owners now use `/audioloom/<root-label>/<owner-name>/<index>` to avoid the old
-  hierarchy collisions. Use explicit OSC overrides for persistent external show files.
-- Default receive binding is loopback rather than all interfaces. Packaged networking
-  requires opt-in in each subsystem's settings.
-- Missing selected devices no longer fall back to the default output.
-- ADM Cartesian/AED output uses the same unit-sphere position. Cube corners outside
-  radius 1 are radially limited consistently in both encodings; no sqrt(3) distance
-  scaling is applied only to AED.
-- Listener following changes the coordinate basis, **not the authored stage transform**.
-  Listener-relative object coordinates are accompanied by an identity listener pose to
-  avoid applying orientation twice. The debug box follows the virtual basis.
-- Switching spatial formats preserves existing target entries/overrides/custom fields.
-
-AudioLoom's MIT notice is in `ThirdParty/AudioLoom/LICENSE`.
-See `FIXES.md` and `Tools/validate_unreal.py` for validation scope and remaining gates.
+Original notices: [AudioLoom MIT license](../ThirdParty/AudioLoom/LICENSE).

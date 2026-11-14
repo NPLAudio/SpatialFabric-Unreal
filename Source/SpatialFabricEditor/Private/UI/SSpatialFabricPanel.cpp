@@ -731,7 +731,7 @@ TSharedRef<SWidget> SSpatialFabricPanel::BuildStageTab()
 				})
 				.ToolTipText(LOCTEXT("HideStageInPIETip",
 					"When checked, hides the stage volume actor in the game view during PIE and packaged builds.\n"
-					"Useful to avoid the stage box cluttering the viewport while testing."))
+					"The authored stage stays visible in the editor, including editor Game View. Uncheck to show it during PIE."))
 				.Content()
 				[
 					SNew(STextBlock)

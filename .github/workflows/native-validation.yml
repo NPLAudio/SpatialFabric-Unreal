@@ -22,6 +22,11 @@ jobs:
           if (-not $env:UNREAL_ENGINE_ROOT) { throw 'Set UNREAL_ENGINE_ROOT on the Unreal runner.' }
           python Tools/validate_unreal.py --output "${{ runner.temp }}/SpatialFabric-${{ github.run_id }}-${{ github.run_attempt }}"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build and silently smoke-test the published example
+        shell: pwsh
+        run: |
+          python Tools/validate_example.py --engine "$env:UNREAL_ENGINE_ROOT" --output "${{ runner.temp }}/SpatialFabricExample-${{ github.run_id }}-${{ github.run_attempt }}"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Upload build and native test evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -30,3 +35,5 @@ jobs:
           path: |
             ${{ runner.temp }}/SpatialFabric-${{ github.run_id }}-${{ github.run_attempt }}/*.log
             ${{ runner.temp }}/SpatialFabric-${{ github.run_id }}-${{ github.run_attempt }}/Report/**
+            ${{ runner.temp }}/SpatialFabricExample-${{ github.run_id }}-${{ github.run_attempt }}/*.log
+            ${{ runner.temp }}/SpatialFabricExample-${{ github.run_id }}-${{ github.run_attempt }}/example_result.json

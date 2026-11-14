@@ -1,4 +1,4 @@
-"""Asynchronous ~20-second live PIE validation (allows background-editor throttling). Quiet generated tones will play.
+"""Asynchronous ~20-second live PIE validation (allows background-editor throttling). Quiet demo sounds will play.
 Start the showcase in PIE first, then run this file from Unreal's console.
 Tests software/device-open behavior, not physical channel mapping or audible fidelity.
 """

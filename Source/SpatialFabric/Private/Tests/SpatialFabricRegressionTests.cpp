@@ -3,6 +3,7 @@
 #include "Misc/AutomationTest.h"
 #include "Engine/World.h"
 #include "Components/SceneComponent.h"
+#include "Components/BoxComponent.h"
 #include "SpatialFabricManagerActor.h"
 #include "SpatialObjectRegistry.h"
 #include "SpatialStageVolume.h"
@@ -200,6 +201,40 @@ bool FSFWorldResolution::RunTest(const FString&)
     const auto Snapshot = M->RegistryComponent->BuildSnapshot({Binding}, nullptr);
     TestEqual(TEXT("Cross-world soft pointer resolved in owning world"), Snapshot.Objects.Num(), 1);
     if (Snapshot.Objects.Num()) TestTrue(TEXT("Uses second world actor, not editor/source transform"), FMath::IsNearlyEqual(Snapshot.Objects[0].StageNormalized.X, 0.6));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FSFStageVisibility, "SpatialFabric.Regression.StageVisibilityEditorAndGame", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FSFStageVisibility::RunTest(const FString&)
+{
+    for (const auto Type : {EWorldType::Editor, EWorldType::Game})
+    {
+        SFAudit::FWorldScope Scope(Type);
+        auto* Stage = Scope.World->SpawnActor<ASpatialStageVolume>();
+        auto* Manager = Scope.World->SpawnActor<ASpatialFabricManagerActor>();
+        Manager->StageVolume = Stage;
+        const FTransform Authored = Stage->GetActorTransform();
+        // Simulate a legacy asset or an editor Game View-hidden box, including selection-only state.
+        Stage->StageBox->SetHiddenInGame(true);
+        Stage->StageBox->SetVisibility(false);
+        Stage->StageBox->bDrawOnlyIfSelected = true;
+        Manager->bHideStageInPIE = false;
+        Manager->ApplyStageVisibility();
+        TestFalse(TEXT("Visible actor is not hidden"), Stage->IsHidden());
+        TestFalse(TEXT("Visible box is not suppressed in Game View"), Stage->StageBox->bHiddenInGame);
+        TestTrue(TEXT("Box component visibility is restored"), Stage->StageBox->IsVisible());
+        TestFalse(TEXT("Unselected volumes remain visible"), Stage->StageBox->bDrawOnlyIfSelected);
+        Manager->bHideStageInPIE = true;
+        Manager->ApplyStageVisibility();
+        const bool Game = Scope.World->IsGameWorld();
+        TestEqual(TEXT("PIE/game hide option does not hide the editor volume"), Stage->IsHidden(), Game);
+        TestEqual(TEXT("Box hidden flag follows world-specific policy"), bool(Stage->StageBox->bHiddenInGame), Game);
+        TestEqual(TEXT("Box visibility follows world-specific policy"), Stage->StageBox->IsVisible(), !Game);
+        Manager->bHideStageInPIE = false;
+        Manager->ApplyStageVisibility();
+        TestTrue(TEXT("Toggle restores visibility without selection"), Stage->StageBox->IsVisible() && !Stage->StageBox->bHiddenInGame && !Stage->IsHidden());
+        TestTrue(TEXT("Visibility never moves the authored stage"), Stage->GetActorTransform().Equals(Authored));
+    }
     return true;
 }
 #endif

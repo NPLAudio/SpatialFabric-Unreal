@@ -1,13 +1,19 @@
-# SpatialSandbox showcase
+# Showcase tour, media refresh and live checks
 
-Open **`/Game/SpatialFabricDemo/Maps/L_SpatialFabric_Showcase`** in SpatialSandbox.
-The local map/assets live outside this plugin's Git repository. The reproducible
-builder and inspection tools **are** distributed in `Tools/Unreal/`.
+Open **`/Game/SpatialFabricDemo/Maps/L_SpatialFabric_Showcase`** in the
+[published example project](../Examples/SpatialFabricShowcase/README.md) or the
+local development SpatialSandbox. The actual project/assets and original WAVs are
+now versioned under `Examples/SpatialFabricShowcase`; prepare a portable copy with
+`Tools/prepare_example.py`. The local sandbox remains independent and is not copied
+wholesale. Reproducible generators/inspection tools are in `Tools/Unreal/`.
+
+For a presentation, use the [timed 10-minute run sheet](../Presentations/DEMO_RUNSHEET.md).
+For ordinary setup, start with [Getting started](GettingStarted.md).
 
 ## Tour
 
 1. Open **Window → Spatial Fabric**; give the panel enough vertical space.
-2. Press **Play**. Use **WASD + mouse** to walk; **Shift+F1** releases the mouse
+2. Press **Play**. Use **WASD + mouse** to walk (**Space** to jump); **Shift+F1** releases the mouse
    so you can use the editor panel while PIE continues.
 3. **Objects / Radar / Output:** three colored objects animate on a 30-second
    repeating sequence; a fourth is a stationary reference. Their independent
@@ -17,20 +23,30 @@ builder and inspection tools **are** distributed in `Tools/Unreal/`.
    With no local player, the explicit `SF_Listener_Rig` is the fallback listener.
    This mode follows the view-target **actor origin**, not the camera-eye offset.
 5. **Playback:** expand `SF_Playback_1`, `_2`, or `_3` and press **Play / Stop**.
-   Audio is deliberately **not** started by entering PIE. Quiet generated tones
+   Audio is deliberately **not** started by entering PIE. Original procedural sounds
    peak around -24 dBFS or below; choose a safe device/channel before listening.
 
 | Station | Content | Route | Behavior |
 |---|---|---|---|
-| `SF_Playback_1` | 1.2 s mono cue | Output channel 1 | One-shot |
-| `SF_Playback_2` | 4 s stereo, alternating 440/660 Hz emphasis | All output channels (`0`) | Loop; toggle Loop off to drain naturally |
-| `SF_Playback_3` | 0.6 s mono cue | Output channel 2 | Auto Replay, 2.5 s delay; Stop cancels replay |
+| `SF_Playback_1` | 1.2 s warm wood/percussion hit with short room reflections | Output channel 1 | One-shot |
+| `SF_Playback_2` | 4 s / 120 BPM stereo groove: drums, bass, chords and ping-pong plucks | Corresponding source/device channels (`0`) | Loop; toggle Loop off to drain naturally |
+| `SF_Playback_3` | 0.6 s double glass/mechanical tap with a resonant tail | Output channel 2 | Auto Replay, 2.5 s delay; Stop cancels replay |
 
 Device IDs are empty, meaning the OS default output. That endpoint must expose
 channel 2 for station 3. Direct PCM playback is **not spatialized by ADM-OSC**:
 connect an external renderer/audio routing system if you want those pipelines linked.
 Use Refresh, device/channel controls, and CSV import/export in the Playback panel.
 The full hardware and undo/redo matrix remains a release gate in `VALIDATION.md`.
+
+The gallery is surrounded by a continuous **120 × 120 m collision floor** and
+**3.5 m perimeter barriers**, so stepping or jumping off the display deck does not
+send the player into the void. `Tools/Unreal/extend_spatialfabric_demo_floor.py`
+adds/updates just this protection without rebuilding the gallery; it verifies
+five floor traces and four boundary traces before saving the demo map.
+
+The stage box stays visible in the editor even in **Game View** and without
+selection. **Hide stage volume when game is running** only hides it in PIE/game;
+uncheck it to show the stage during play. This setting never moves the stage.
 
 ## OSC endpoints
 
@@ -64,23 +80,39 @@ to untrusted networks.
 
 Requirements: SpatialFabric and OSC enabled in the project, UE 5.8, the **Python
 Editor Script Plugin**, and editor scripting/import/sequencer facilities. The
-local SpatialSandbox already has these enabled and uses its FirstPerson game mode.
+published example enables these and supplies its own original C++ walking game mode.
+The local SpatialSandbox instead uses its pre-existing FirstPerson game mode.
 The builder does not change project defaults or the existing FirstPerson map.
-Other projects need their own playable pawn/game mode for the walking tour.
+Other projects need a playable pawn/game mode for the walking tour.
 
 Save unrelated edits first. In **Output Log → Cmd**, run this file's absolute path:
 
 ```text
-py "C:/dev/UnrealSpatial/SpatialSandbox/Plugins/SpatialFabric/Tools/Unreal/build_spatialfabric_demo.py"
+py "C:/dev/SpatialFabricShowcase/Plugins/SpatialFabric/Tools/Unreal/build_spatialfabric_demo.py"
 ```
 
 The builder replaces generated assets under `/Game/SpatialFabricDemo`, regenerates
 actors tagged `SF_DemoGenerated`, and preserves untagged actors. Treat the generated
 namespace as owned by the builder: copy assets elsewhere before customizing them.
-It writes raw WAV sources to `SpatialSandbox/SourceAssets/SpatialFabricDemo/Audio/`
-and a build report to `SpatialSandbox/Saved/SpatialFabricDemo/build_report.json`.
-The saved level contains 85 generated actors and 15 Unreal assets, including nine
+Replace the example absolute path with your actual prepared project/plugin location.
+It writes raw WAV sources to `<project>/SourceAssets/SpatialFabricDemo/Audio/`
+and a build report to `<project>/Saved/SpatialFabricDemo/build_report.json`.
+The saved level contains 90 generated actors and 15 Unreal assets, including nine
 materials, three Force Inline SoundWaves, the brand texture, sequence, and map.
+
+### Refresh just the sounds
+
+The original procedural sound designs are in `Tools/Unreal/demo_audio.py`.
+The first station uses a warmer, damped percussion hit rather than a synthetic
+rising cinematic sweep. The sounds use no downloaded recordings, retain the existing asset names/durations/channels,
+and are peak-limited to 0.06 (about -24.4 dBFS). The stereo loop has deliberately
+different left/right instrumentation and short seam fades.
+
+To regenerate/reimport audio without rebuilding the stage or changing routing,
+stop PIE/playback, save edits, and run `Tools/Unreal/refresh_spatialfabric_demo_audio.py`
+from Unreal's Cmd console using its absolute path. It refreshes the three existing
+SoundWaves, invalidates prepared PCM caches, updates station titles, saves the
+level, and writes `Saved/SpatialFabricDemo/audio_refresh.json`. No sound is started.
 
 ## Repeat the live checks
 
@@ -116,7 +148,11 @@ replace these output files; copy evidence elsewhere if it must be retained.
 
 ### Observed validation
 
-- 24 live PIE checks passed: prepared/manual-start assets, numeric/address-only
+- The published example compiled as a standalone source project and passed ten silent
+  PIE checks, including its own walking character, cue decoding, animation, actual
+  outer-floor landing and a perimeter-blocked capsule. No audio was played by that test.
+- Nine floor/boundary blocking traces and the editor/Game View unselected stage check passed.
+- 24 live PIE checks passed in the development sandbox: prepared/manual-start assets, numeric/address-only
   OSC triggers, actual WASAPI worker playback, natural EOF, live loop exit,
   replay/cancellation, missing-device fail-closed behavior, moving objects,
   virtual listener coordinates, no authored stage motion, and OSC play/stop while
@@ -138,12 +174,16 @@ No third-party asset downloads were needed.
 
 - Geometry: references to `/Engine/BasicShapes`, supplied with Unreal Engine;
   governed by Epic's applicable Unreal Engine terms, not relicensed as MIT here.
-- FirstPerson pawn/input/game mode: existing SpatialSandbox template content;
-  retain Epic's applicable template/content terms.
-- Materials, animation, labels and test tones: generated locally by the builder;
+- Published example pawn/game mode: original minimal C++ source, repository MIT.
+  The development SpatialSandbox's pre-existing Epic FirstPerson template content
+  is not copied into the published example.
+- Materials, animation, labels and original sound designs: generated locally;
   no third-party audio recordings or sample-library licenses.
 - Unified brand texture: this repository's `assets/spatialfabric-unified.png`;
   original SpatialFabric/AudioLoom artwork and attribution are documented in
   [`assets/README.md`](../assets/README.md).
-- Builder/tool source: repository MIT license. Generated `.umap`/`.uasset` files,
-  raw WAVs, Saved reports, and local MCP configuration are not plugin Git content.
+- Builder/tool source: repository MIT license. The published `.umap`/`.uasset`
+  snapshot and matching raw WAVs are included under `Examples/SpatialFabricShowcase`;
+  see its inventory and asset-license notice. Saved reports, caches, binaries and
+  local MCP configuration are not committed. Do not treat Unreal engine references
+  as standalone MIT-licensed engine content.

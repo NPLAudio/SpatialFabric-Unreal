@@ -1,0 +1,14 @@
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+.vs/
+.idea/
+.pi/
+*.sln
+*.suo
+*.vcxproj*
+*.pdb
+*.log
+__pycache__/
+*.pyc

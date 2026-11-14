@@ -22,9 +22,10 @@ This builds the plugin for **Editor, Development, and Shipping**, creates a temp
 project outside the plugin, loads the built plugin, runs all `SpatialFabric*` native
 regressions with NullRHI/NoSound, and checks the JSON report for failures, skipped tests,
 or an empty test suite. It never opens or saves SpatialSandbox's level/config files.
-Latest UE 5.8 Win64 evidence: `SpatialFabricValidation-5gg8mmdf`, **25 tests passed**,
+Latest UE 5.8 Win64 evidence: `SpatialFabricValidation-7d4mvdvu`, **26 tests passed**,
 zero failed/skipped; Editor/Development/Shipping builds passed. Fast Python checks:
-**14 passed**.
+**22 passed** (including procedural sound design, example inventory/preparation,
+document links and PowerPoint timing/notes/package checks).
 Logs, the built plugin, and the test report remain in the printed temporary directory.
 Use `--editor-only` for iteration, or `--output` with a new empty directory to retain
 named evidence. Output directories inside the source plugin are rejected.
@@ -45,6 +46,8 @@ The repository tests invoke production code for:
 - Registry/router association after a missing actor, cross-world actor resolution,
   editor snapshots without BeginPlay, stage reassignment/clear, and negative log counts.
 - Attached listener feedback and production stage rotation/normalization.
+- Stage visibility in editor/Game View versus game worlds, restored component visibility,
+  unselected-box display, hide/show round-trip, and unchanged authored stage transforms.
 - Actual ADM metadata/coordinates, coherent XYZ/AED radius, Custom token validation,
   discrete axis/value pairing, and packet changes when send flags/custom fields change.
 - Descendant OSC address separation, explicit Stop tick cancellation, typed play triggers.
@@ -65,6 +68,27 @@ missing-device failure were exercised, and no authored stage motion occurred.
 Physical listening/capture, latency, the full editor workflow matrix, and packaged
 codec playback remain unverified. Evidence stays in the sandbox's
 `Saved/SpatialFabricDemo/` directory and is not plugin Git content.
+
+## Published example and presentation evidence
+
+`python Tools/validate_example.py --engine "C:/Program Files/Epic Games/UE_5.8"`
+prepares a new standalone source project, builds its Editor target and runs a
+silent disposable PIE test. Latest evidence: `SpatialFabricExampleValidation-4iee9ojt`,
+**10 checks passed**. Its original C++ walking character landed on the outer floor
+and a swept capsule was blocked by the perimeter; animation and three Force Inline
+decodes succeeded without playing audio. No Epic FirstPerson content or enabled MCP
+server was needed. Networking is disabled only in the disposable copy to avoid
+another working editor's input ports. Run Unreal build jobs sequentially: installed
+engine UBT instances share a global mutex.
+
+The 16-slide presentation was opened/rendered in Microsoft PowerPoint; its PDF and
+contact sheet come from that export. Speaker notes are embedded. Source timings
+sum to 900 seconds of talk plus 600 seconds of demo, excluding open Q&A/reference
+slides. This validates document structure/rendering, not a venue's display/audio setup.
+
+Native artifacts/reports stay outside the repository. The example Content/SourceAssets
+snapshot is intentionally versioned under `Examples/SpatialFabricShowcase`; the
+editable presentation/PDF are intentionally versioned under `Presentations`.
 
 ## Required manual/integration gates before a show release
 

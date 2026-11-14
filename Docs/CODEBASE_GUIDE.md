@@ -1,90 +1,159 @@
-![SpatialFabric and AudioLoom, woven together](../assets/spatialfabric-unified.png)
+![SpatialFabric / AudioLoom](../assets/spatialfabric-unified.png)
 
-# SpatialFabric — codebase guide
+# Codebase guide: responsibilities, lifetime and extension points
 
-This document explains **how the plugin fits together** before you dive into C++ files. Read it once, then use file-top comments in the source as a map.
+[Documentation index](README.md) · [Build/test workflow](Development.md)
 
-## What SpatialFabric does (one sentence)
+## Repository and module boundaries
 
-It reads actor positions into a stable-identity snapshot, encodes/routes OSC for external spatial systems, and includes independent direct-device PCM playback. Spatial and playback output are separate pipelines.
+One descriptor owns four modules. Keep these names stable for serialized assets,
+Blueprints, Engine configuration and existing C++ consumers:
 
-## Included audio playback modules
+| Module | Host | Responsibility |
+|---|---|---|
+| SpatialFabric | Runtime | Stage, registry, bindings, protocol router, ADM/Custom, spatial OSC |
+| SpatialFabricEditor | Editor | Five-tab Spatial Fabric panel and editor/PIE network ownership |
+| AudioLoom | Runtime | SoundWave decode/cache, PCM cursor/encoding, device backend, playback OSC |
+| AudioLoomEditor | Editor | Playback widgets/details, CSV, transactional edits and reimport handling |
 
-The same `SpatialFabric.uplugin` also owns `Source/AudioLoom` (runtime device/channel
-playback, SoundWave loading, OSC transport subsystem) and `Source/AudioLoomEditor`
-(playback panel, Details customization, CSV routing). `SpatialFabricEditor` embeds
-`SAudioLoomPanel` as its **Playback** tab. The legacy modules/class names are retained
-to preserve serialized `/Script/AudioLoom` references and existing C++ dependencies.
+The new UI embeds `SAudioLoomPanel` in Playback. Retaining module/class names is
+not the same as automatically merging the two signal paths: spatial output is
+control data; direct playback supplies samples to OS devices. There is no inferred
+renderer-input/channel association between components on the same actor.
 
-This is one installable plugin, not one runtime pipeline: spatial snapshots drive
-external positioning protocols; AudioLoom plays PCM directly to OS devices. The
-OSC servers/settings are independent. See [Audio playback](AudioPlayback.md) for
-migration, ports, platform support, and known limitations.
+`Source/Shared/SpatialFabricOSCReceiver.h` is a shared private include, not another
+module or reflected class. Both independent runtime modules use it without an
+AudioLoom↔SpatialFabric dependency cycle. `Examples/SpatialFabricShowcase/Source`
+is a separate original host-project module, not part of the plugin's four modules.
 
-## Main ideas (no jargon)
+## Spatial frame pipeline
 
-| Idea | Meaning |
-|------|--------|
-| **Binding** | “Track *this* actor and treat it as spatial object #3 (for example).” |
-| **Stage volume** | A box in the level: center = (0,0,0) in normalized space; edges = ±1. |
-| **Snapshot** | One frame’s worth of all tracked positions + optional listener data. |
-| **Adapter** | Code that turns snapshot data into a specific protocol (e.g. `/adm/obj/1/xyz`). |
-| **Router** | Sends each adapter only the objects that are routed to that adapter. |
+1. Manager resolves its Stage Volume **in its own world** and applies visibility.
+   Soft references/label fallback must not accidentally bind the editor copy while
+   running in PIE. Stage reassignment/clear must take effect without stale cached state.
+2. Stage resolves a virtual listener basis when enabled. It never moves an authored
+   ancestor toward its own child. Fixed mode uses the box frame; followed mode uses
+   the chosen actor's location/rotation.
+3. Registry walks enabled bindings, resolves valid target actors and creates
+   `FSpatialNormalizedState` values. `BindingIndex` ties a compact snapshot entry back
+   to its original binding when another actor is missing. It is not inferred from
+   the compacted array position. ADMName remains distinct from Label.
+4. Router filters per adapter and resolves each target's ID override/CustomFields.
+   The same actor can have different IDs in two protocol outputs.
+5. Adapter `BuildMessages` is a pure encoding path shared by preview/output. Its
+   complete message list includes metadata, tokens and routing-dependent addresses.
+6. Rate limiting gates batches; transmit-on-change compares encoded messages.
+   Transport reuses endpoint clients. UDP acceptance is not delivery confirmation.
 
-## Data flow (every frame)
+Main types live in SpatialFabricTypes.h. The runtime produces normalized snapshots;
+legacy/raw symmetry types are not evidence of an additional active capture pipeline.
 
-1. **`ASpatialFabricManagerActor::Tick`** runs (or the editor tickable calls **`ProcessFrame`** on existing managers without PIE). Preview state capture is independent of networking permission; actors are never auto-spawned by the tickable.
-2. **`USpatialObjectRegistry::BuildSnapshot`** walks **`ObjectBindings`**, resolves each **`TargetActor`**, and fills **`FSpatialFrameSnapshot`** using **`ASpatialStageVolume`** for normalization.
-3. **`FProtocolRouter::ProcessFrame`** filters the snapshot per adapter type, then calls **`ISpatialProtocolAdapter::ProcessFrame`** on ADM-OSC and Custom adapters.
-4. Each state carries its source `BindingIndex`; the router never infers association from compacted array position. Adapters' pure `BuildMessages` encoders produce the same messages for preview and transmission.
-5. Adapters use a reusable **`USpatialOSCClientComponent`** to send to their configured endpoint. Complete encoded messages determine send-on-change behavior.
-6. Listener following updates a virtual coordinate basis, never the authored stage transform. ADM xyz/aed share a radially limited unit-sphere position.
+## Coordinates and visibility
 
-## Suggested reading order (C++)
+Stage-local values are axis-clamped [-1,1]; meter conversion multiplies physical
+half-size. ADM limits the point radially to 1 before both XYZ/AED encoding. Its
+Cartesian output is `(right, front, up)`; polar azimuth uses `atan2(-right, front)`.
+Custom handles its own template/range conventions. Do not reintroduce the obsolete
+“negate Y only” Cartesian description or inconsistent AED distance scaling.
 
-1. **`SpatialFabricTypes.h`** — all structs/enums; everything else references these.
-2. **`ISpatialProtocolAdapter.h`** — the “plugin point” for new protocols.
-3. **`ProtocolRouter.h` / `.cpp`** — how objects are filtered per adapter.
-4. **`SpatialObjectRegistry`** — actor → normalized state.
-5. **`SpatialStageVolume`** — world position → [-1, 1] and meters.
-6. **`SpatialFabricManagerActor`** — wires components, tick, adapters.
-7. **`SpatialMath`** — polar/Cartesian helpers for OSC.
-8. **`Adapters/ADMOSCAdapter`**, **`Adapters/CustomAdapter`** — wire format details.
-9. **`SpatialOSCClientComponent` / `SpatialOSCServerComponent`** — reusable UE OSC clients and exact-bind server polling.
-10. **`Source/Shared/SpatialFabricOSCReceiver.h`** — bounded OSC decoder and socket ownership shared by the independent spatial/playback modules; avoids UE 5.8's loopback-to-LAN rewrite.
-11. **`SpatialFabricEditorModule`** + **`SSpatialFabricPanel`** — editor UI (large file; use section comments).
-12. **`Tools/Unreal/`** — reproducible [SpatialSandbox showcase](SpatialSandboxDemo.md) and live/capture diagnostics, not runtime code.
+Follow mode uses a virtual basis and identity listener output because objects are
+already relative. Player view-target actor origin/rotation is not an HMD/camera-eye
+pose API. See the [operator reference](SpatialRouting.md) before changing semantics.
 
-## Unreal Engine concepts you’ll see
+Visibility policy is separate: editor stage display is restored even in Game View
+and without selection; only game worlds obey the PIE/game hide flag. Component
+visibility and inherited HiddenInGame/selection-only state must agree. Avoid marking
+render state dirty every frame when a property has not actually changed. Visibility
+must not change stage transforms or routing.
 
-- **`UCLASS` / `USTRUCT` / `UPROPERTY`** — reflection; Editor and Blueprints can edit or read these.
-- **`AActor`** — anything placed in a level (your stage volume, manager, tracked props).
-- **`UActorComponent`** — logic attached to an actor (registry, OSC client/server).
-- **`TSoftObjectPtr`** — reference that may not be loaded; used for picking actors in the editor.
-- **Game thread** — spatial routing/UDP receive dispatch run here; adapters are not thread-safe for background use. PCM device output uses its separate worker/callback backend.
+## Playback pipeline
 
-## Where settings live
+1. `UAudioLoomComponent::Play` cancels a prior instance/replay and calls PrepareAudio.
+2. Loader validates imported WAV or supported inline cooked data, then prepares
+   interleaved float PCM. First decode is synchronous; immutable shared storage
+   avoids a full clip copy for every replay. Streaming/certain channel-order policies
+   fail explicitly instead of spinning or searching a source-file fallback.
+3. Backend startup is asynchronous. The selected device/mix format supplies the
+   actual render rate/layout. Explicit missing devices do not silently choose default.
+4. `FAudioLoomPcmCursor` advances at source-rate/device-rate, interpolates frames,
+   performs channel mapping, wraps when looping and emits zeros beyond EOF.
+5. `AudioLoomEncodePCM` writes negotiated float/integer packed samples. The Windows
+   worker checks stream operations and drains queued one-shot audio. Mac callbacks
+   validate/pre-zero layouts and avoid callback allocation/logging; Mac testing is separate.
+6. Worker events drive actual playing/stopped monitoring. Natural completion can
+   arm an auto-replay delay; explicit Stop cancels it. EndPlay/unregister teardown
+   stops/joins workers and prevents stale callbacks/queues from leaking into a replay.
 
-- **`USpatialFabricSettings`** — project defaults (ports, IPs, debug flags): **Project Settings → Plugins → Spatial Fabric**, stored in config such as **`DefaultSpatialFabric.ini`**.
-- **`FSpatialAdapterConfig`** on the manager — per-format IP, port, send rate, coordinate mode, etc.
+The component cache must be invalidated when its SoundWave content/routing changes
+or on reimport. A tooling import-overwrite can differ from an ordinary Reimport
+notification: the focused audio refresher explicitly invalidates prepared data by
+reassigning the same asset through the reflected property after import.
 
-## Adding a new protocol (high level)
+## Threading and lifetime
 
-1. Add a value to **`ESpatialAdapterType`** in **`SpatialFabricTypes.h`** (and any UI/panel wiring).
-2. Implement **`ISpatialProtocolAdapter`** (see **`FADMOSCAdapter`** as a full example).
-3. Register it in **`ASpatialFabricManagerActor::InitializeAdapters`**.
-4. Ensure **`FilterSnapshotForAdapter`** in **`ProtocolRouter.cpp`** still matches binding **`Targets`** to your type (same pattern as Custom).
+- Actor resolution, snapshots, pure protocol encoding, Blueprint delegates and
+  public transport requests are game-thread work.
+- Exact-bind OSC input is bounded nonblocking receive on the **core ticker**, not a
+  world/component tick dependency. This preserves receive behavior when paused or
+  a viewport is not realtime.
+- The receiver's ticker captures weak self; a pinned receiver and copied dispatcher
+  survive a callback that stops/releases its owner. UObject owners are weakly captured.
+  Unregister/BeginDestroy/deinitialize release sockets/ticker handles promptly.
+- OS PCM rendering uses its platform worker/callback. Immutable PCM and synchronized
+  state/events are the boundary; do not touch UObjects, allocate large buffers or
+  log from a real-time callback.
+- Replay timing is component/world ticking, not distributed/sample-clock scheduling.
+- Editor delegates release editor input sockets before PIE duplication/start, transfer
+  an active playback listener, and restore state after PIE. Centralized ownership
+  avoids two panels/worlds binding the same endpoint.
 
-## Tests
+## Public APIs: reflection is explicit
 
-Automation tests live in **`SpatialFabricTests.cpp`**. They validate math and address strings without loading a full level.
+A C++ method's public visibility does not make it a Blueprint node. Check its
+`UFUNCTION` annotation. For example Manager `ProcessFrame`, `InitializeAdapters`
+and `BuildOutputPreview` are C++ helpers; reflected control includes manager
+spawn/server/client/log functions and stage conversion/listener helpers. AudioLoom
+transport/prepare/error/device/channel/path methods are reflected as documented.
 
-Run `python -m unittest discover -s Tools -p "test_*.py"` from the plugin root for
-structural and native-report-runner checks. Run `Tools/validate_unreal.py --engine
-<UE install>` for Editor/Development/Shipping compilation and actual native regressions.
-See `VALIDATION.md` for the manual hardware/cooked-content release gates. Automation
-results are read from JSON, not Unreal's sometimes-zero failure exit status.
+`UPROPERTY`/`USTRUCT` fields are serialized/editor-visible according to their flags;
+private non-UObject socket helpers are not saved runtime objects. Actor soft paths
+are not filesystem paths. Weak references must be validated against the correct
+world/lifetime, not merely checked for a non-null cached address.
 
----
+## Editor / data operations
 
-For line-level explanations, see the comment blocks at the top of each source file, **inline comments** inside functions (especially OSC, router, registry, adapters), and notes above non-trivial blocks.
+The panel is an operator surface, not an automatic actor spawner. Changes should
+participate in transactions. Format changes preserve saved targets/custom data.
+CSV parses records (including quoted multiline fields) and validates numbers before
+applying each row; valid rows can apply while others report errors. Asset import
+and editor undo behavior still need their full integration matrix, not only unit tests.
+Logs are bounded and negative/oversized requests must not read invalid indices.
+
+Config distinction: SpatialFabric settings use `DefaultSpatialFabric.ini`;
+AudioLoom OSC retains `DefaultEngine.ini`. Adapter actor settings can differ from
+project defaults. Do not document a non-existent independent EnableInPIE field.
+
+## Reading order
+
+1. SpatialFabricTypes.h and ISpatialProtocolAdapter.h.
+2. SpatialStageVolume.cpp and SpatialObjectRegistry.cpp.
+3. ProtocolRouter.cpp, ADMOSCAdapter.cpp and CustomAdapter.cpp.
+4. SpatialFabricManagerActor.cpp and managed OSC client/server components.
+5. Source/Shared/SpatialFabricOSCReceiver.h and its packet/lifecycle regressions.
+6. AudioLoomPcmLoader.cpp, AudioLoomPcmRender.cpp and playback backend.
+7. AudioLoomComponent.cpp and AudioLoomOscSubsystem.cpp.
+8. SpatialFabricEditorModule.cpp, both panel implementations and CSV code.
+9. Production regressions, native/example validation runners and operator guides.
+
+## Add or change behavior safely
+
+Separate encoding from effects, preserve stable binding identity and world ownership,
+then test malformed input/teardown as carefully as the happy path. For a new protocol,
+add its reflected enum/config entry, implement the adapter interface, wire factory/UI
+registration, and verify actual packets plus preview equivalence. Do not count a UI
+entry as renderer certification. For device changes, validate real format/rate/channel
+behavior on the target OS/interface in addition to the pure cursor/encoding tests.
+
+See [VALIDATION.md](../VALIDATION.md) for authoritative JSON checks, current evidence,
+manual gates and what is intentionally not certified. Historical AUDIT.md explains
+why some apparently defensive structure exists; it is not current test output.

@@ -33,8 +33,16 @@ Docs/*
 !Docs/CODEBASE_GUIDE.md
 !Docs/AudioPlayback.md
 !Docs/SpatialSandboxDemo.md
+!Docs/README.md
+!Docs/GettingStarted.md
+!Docs/SpatialRouting.md
+!Docs/OSCReference.md
+!Docs/Troubleshooting.md
+!Docs/Development.md
 
 # Release output and Python caches
 dist/
 __pycache__/
 *.pyc
+DerivedDataCache/
+.pi/

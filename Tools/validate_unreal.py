@@ -24,6 +24,7 @@ REQUIRED_TESTS = {
     "SpatialFabric.OSC.LoopbackAndClientReuse",
     "SpatialFabric.OSC.ExactBindAndReceive",
     "SpatialFabric.OSC.CoreTickerLifecycle",
+    "SpatialFabric.Regression.StageVisibilityEditorAndGame",
     "SpatialFabric.OSC.BoundedDatagramDecoder",
     "SpatialFabric.OSC.ComponentUnregisterClosesSocket",
     "SpatialFabric.CSV.ValidationMultilineAndUndo",
