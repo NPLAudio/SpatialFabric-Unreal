@@ -3,7 +3,7 @@
   "EngineAssociation": "5.8",
   "Category": "Audio",
   "Description": "SpatialFabric spatial-control and direct-playback showcase",
-  "AdditionalPluginDirectories": ["../.."],
+  "AdditionalPluginDirectories": ["../../.."],
   "Modules": [{"Name": "SpatialFabricShowcase", "Type": "Runtime", "LoadingPhase": "Default"}],
   "Plugins": [
     {"Name": "SpatialFabric", "Enabled": true},

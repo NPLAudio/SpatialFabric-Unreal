@@ -42,9 +42,10 @@ Then open `SpatialFabricShowcase.uproject`. Let first shader compilation finish.
 Its startup/default map is the showcase. This is source, not a universal prebuilt
 application; do not reuse arbitrary DLLs from another engine build.
 
-**Direct repository opening:** the checked-in descriptor searches `../..` for the
-plugin. Keep the full repository layout. If the engine/project setup cannot resolve
-that path, prepare the portable copy instead. Moving only this project folder without
+**Direct repository opening:** the checked-in descriptor searches `../../..`
+(the repository's parent) for the plugin. Unreal discovers plugins in subfolders
+of each search directory. Keep the full repository layout. If the engine/project
+setup cannot resolve that path, prepare the portable copy instead. Moving only this project folder without
 its plugin or changing the relative layout requires an explicit plugin installation.
 
 ## Operate it
