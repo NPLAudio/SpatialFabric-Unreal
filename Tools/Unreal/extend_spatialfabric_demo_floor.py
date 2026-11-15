@@ -17,6 +17,8 @@ try:
         raise RuntimeError("Open the showcase first")
     actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
     existing = {a.get_actor_label(): a for a in actors.get_all_level_actors() if a.actor_has_tag("SF_DemoGenerated")}
+    if 'Gallery foundation' in existing:
+        raise RuntimeError('Room layout already has a collision floor and enclosing walls; use rearrange_spatialfabric_demo_rooms.py, not the legacy outdoor-floor extender')
     cube = unreal.load_asset("/Engine/BasicShapes/Cube")
     panel = unreal.load_asset("/Game/SpatialFabricDemo/Materials/M_SF_Panel")
     charcoal = unreal.load_asset("/Game/SpatialFabricDemo/Materials/M_SF_Charcoal")

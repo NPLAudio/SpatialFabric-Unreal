@@ -67,7 +67,10 @@ try:
                 "prepared": prepared, "channel": component.get_output_channel(), "osc": component.get_osc_address()})
             if not prepared:
                 raise RuntimeError("Cannot prepare updated audio: " + component.get_last_playback_error())
-        titles = {"Station title 0": "IMPACT / CH 1", "Station title 1": "STEREO GROOVE / ALL", "Station title 2": "GLASS CUE / CH 2"}
+        titles = {"Station title 0": "IMPACT / CH 1", "Station title 1": "STEREO / MATCHING CHANNELS", "Station title 2": "GLASS CUE / CH 2"}
+        room_spec = importlib.util.spec_from_file_location('sf_audio_room_labels', Path(__file__).with_name('room_layout.py'))
+        rooms = importlib.util.module_from_spec(room_spec); room_spec.loader.exec_module(rooms)
+        titles.update({name: value for name, value, *_ in rooms.signs() if name in ('Mono guide', 'Stereo guide', 'Replay guide')})
         for actor in unreal.get_editor_subsystem(unreal.EditorActorSubsystem).get_all_level_actors():
             if actor.actor_has_tag("SF_DemoGenerated") and actor.get_actor_label() in titles:
                 actor.modify()

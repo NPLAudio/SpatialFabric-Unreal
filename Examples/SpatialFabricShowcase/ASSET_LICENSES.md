@@ -8,7 +8,7 @@ animation package is bundled in this example.
 | C++ walking character/game mode, config and helper code | Original SpatialFabric example source; repository MIT license |
 | Map layout, material graphs, labels, collision geometry setup and sequence keys | Generated/original SpatialFabric example content; repository MIT license for original contributions |
 | WAV sources and imported SoundWaves | Original deterministic procedural sound designs in Tools/Unreal/demo_audio.py; repository MIT license; not third-party recordings |
-| Unified brand texture | Derived from repository SpatialFabric/AudioLoom artwork; retain assets/README.md attribution and original AudioLoom MIT notice |
+| Logo/billboard assets | Not included in this slim room example; repository branding remains separately attributed in assets/README.md |
 | `/Engine/BasicShapes` geometry and engine materials/editor-resource references | References to content supplied with Unreal Engine; Epic's applicable Unreal Engine terms, not relicensed as MIT here |
 | Unreal engine/runtime dependencies | Require a valid Unreal Engine installation and applicable Epic terms |
 

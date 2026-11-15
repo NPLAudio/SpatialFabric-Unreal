@@ -31,7 +31,8 @@ at 1×/1.5×/2× layout scales. Earlier evidence: `7d4mvdvu` (26, full builds) a
 The controller has **35 passing tests** (30 core + 5 desktop GUI); the Node scene
 client/examples have **4 passing tests**, including actual UDP paging and host-API
 stubs for Node-RED/Max wrappers. Max/Node-RED application UIs were not launched.
-Of the root Tools checks, **20 pass**; two presentation/document checks are currently
+Of the root Tools checks, **24 pass** (including four room-plan geometry/navigation
+checks); two presentation/document checks are currently
 blocked because the existing `Presentations/` folder is missing from the working
 tree. That unrelated deletion was not restored or included as a scene-query change.
 Logs, the built plugin, and the test report remain in the printed temporary directory.
@@ -99,10 +100,16 @@ hardware, or every Max/Node-RED version. See [the command contract](Docs/SceneQu
 
 `python Tools/validate_example.py --engine "C:/Program Files/Epic Games/UE_5.8"`
 prepares a new standalone source project, builds its Editor target and runs a
-silent disposable PIE test. Latest evidence: `SpatialFabricExampleValidation-4iee9ojt`,
-**10 checks passed**. Its original C++ walking character landed on the outer floor
-and a swept capsule was blocked by the perimeter; animation and three Force Inline
-decodes succeeded without playing audio. No Epic FirstPerson content or enabled MCP
+silent disposable PIE test. Current room publication evidence:
+`SpatialFabricRoomPublication-7wo9j1_w`, **13 checks passed**. Its original C++ walking
+character landed in the hallway, passed all four doorways, and was blocked by a
+hall wall, room divider and hall end cap. Animation and three Force Inline decodes
+succeeded without playing audio. The focused layout update also passed 21 static
+floor/door/wall traces and preserved cue settings, routes and sequence identity.
+The full rewritten generator was exercised in the disposable project and recreated
+66 generated actors. The dependency-closed example has 13 packages plus 3 WAVs;
+unused banner/brand-texture/driver packages and the unowned outside plane are excluded.
+Earlier open-gallery evidence `SpatialFabricExampleValidation-4iee9ojt` passed ten checks. No Epic FirstPerson content or enabled MCP
 server was needed. Networking is disabled only in the disposable copy to avoid
 another working editor's input ports. Run Unreal build jobs sequentially: installed
 engine UBT instances share a global mutex.

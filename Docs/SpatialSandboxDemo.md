@@ -15,10 +15,14 @@ For ordinary setup, start with [Getting started](GettingStarted.md).
 1. Open **Window → Spatial Fabric**; give the panel enough vertical space.
 2. Press **Play**. Use **WASD + mouse** to walk (**Space** to jump); **Shift+F1** releases the mouse
    so you can use the editor panel while PIE continues.
-3. **Objects / Radar / Output:** three colored objects animate on a 30-second
+3. Start in the hallway. **Room 1** contains spatial motion; **rooms 2 / 3 / 4**
+   contain mono percussion, stereo groove and replay. Each has its own doorway and
+   solid partitions; no large instruction panel stands in front of another exhibit.
+   **Objects / Radar / Output:** three colored objects animate on a 30-second
    repeating sequence; a fourth is a stationary reference. Their independent
    routes use ADM IDs **1–4** and Custom IDs **101–104**.
-4. **Stage:** switch **Follow Position & Orientation** on to express coordinates
+4. **Stage:** defaults to **Off / stage-fixed**, so hallway walking does not clamp
+   the room's objects against the front edge. Optionally switch **Follow Position & Orientation** on to express coordinates
    relative to the player/view-target actor. The authored stage does not move.
    With no local player, the explicit `SF_Listener_Rig` is the fallback listener.
    This mode follows the view-target **actor origin**, not the camera-eye offset.
@@ -38,11 +42,20 @@ connect an external renderer/audio routing system if you want those pipelines li
 Use Refresh, device/channel controls, and CSV import/export in the Playback panel.
 The full hardware and undo/redo matrix remains a release gate in `VALIDATION.md`.
 
-The gallery is surrounded by a continuous **120 × 120 m collision floor** and
-**3.5 m perimeter barriers**, so stepping or jumping off the display deck does not
-send the player into the void. `Tools/Unreal/extend_spatialfabric_demo_floor.py`
-adds/updates just this protection without rebuilding the gallery; it verifies
-five floor traces and four boundary traces before saving the demo map.
+The compact building has a continuous collision foundation, four enclosed rooms,
+a **5.5 m wide hallway**, clear 2–3 m doorways and blocking outer/divider walls.
+The room layout verifies **10 floor, 4 doorway and 7 wall traces** before saving.
+Tracked spheres are visual control objects, not moving collision obstacles.
+
+Decorative speaker cabinets/plinths, the billboard/logo screen, floating object
+labels, duplicate axis labels and the oversized 120 m outdoor floor are removed.
+Only room names, short real-control instructions and two useful stage axes remain.
+Walls provide **visual separation**, not acoustic isolation: direct PCM playback
+still bypasses Unreal attenuation/occlusion and does not become room-spatialized.
+
+`Tools/Unreal/rearrange_spatialfabric_demo_rooms.py` updates only the room layout,
+preserves cue config and ADM/Custom routes/sequence, refuses unsaved edits/PIE/active
+audio, and backs up the map. The old outdoor-floor extender now refuses room maps.
 
 The stage box stays visible in the editor even in **Game View** and without
 selection. **Hide stage volume when game is running** only hides it in PIE/game;
@@ -97,8 +110,22 @@ namespace as owned by the builder: copy assets elsewhere before customizing them
 Replace the example absolute path with your actual prepared project/plugin location.
 It writes raw WAV sources to `<project>/SourceAssets/SpatialFabricDemo/Audio/`
 and a build report to `<project>/Saved/SpatialFabricDemo/build_report.json`.
-The saved level contains 90 generated actors and 15 Unreal assets, including nine
-materials, three Force Inline SoundWaves, the brand texture, sequence, and map.
+The room scene contains **66 generated actors and 11 text actors** (previously
+90/17). The published dependency-closed example contains **13 Unreal packages**:
+eight materials, three Force Inline SoundWaves, sequence and map, plus three WAV
+sources. Unused banner/brand-texture/driver-material packages are not distributed.
+Unowned sandbox actors are not deleted locally or silently included in the published
+project; publication reviews/removes the unrelated outside plane in a disposable copy.
+
+To publish a saved room map safely from a development sandbox, run ordinary Python:
+
+```powershell
+python Tools/publish_room_example.py --engine "C:/Program Files/Epic Games/UE_5.8" --sandbox C:/dev/UnrealSpatial/SpatialSandbox
+```
+
+This builds a disposable copy, removes only the reviewed unbound outside primitive,
+checks dependency closure and performs the silent walking-pawn smoke before replacing
+versioned example assets and their manifest. It never edits the original sandbox.
 
 ### Refresh just the sounds
 
@@ -148,10 +175,12 @@ replace these output files; copy evidence elsewhere if it must be retained.
 
 ### Observed validation
 
-- The published example compiled as a standalone source project and passed ten silent
-  PIE checks, including its own walking character, cue decoding, animation, actual
-  outer-floor landing and a perimeter-blocked capsule. No audio was played by that test.
-- Nine floor/boundary blocking traces and the editor/Game View unselected stage check passed.
+- The room layout passed 21 static floor/door/wall traces, preserved all three cue
+  configurations, four bindings and adapter configs, and retained the same motion sequence.
+- The published room example's silent PIE smoke covers its own walking pawn, decoding,
+  animation, hallway landing, all four doorway sweeps, divider and outer/end-wall blocks.
+  No audio is played by that test; see `VALIDATION.md` for current evidence.
+- Earlier open-gallery nine floor/boundary traces and the editor/Game View stage check passed.
 - 24 live PIE checks passed in the development sandbox: prepared/manual-start assets, numeric/address-only
   OSC triggers, actual WASAPI worker playback, natural EOF, live loop exit,
   replay/cancellation, missing-device fail-closed behavior, moving objects,

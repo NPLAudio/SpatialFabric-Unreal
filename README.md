@@ -76,6 +76,9 @@ for intentional OSC-address, listener and cooked-loading changes.
 
 The actual `.umap`, `.uasset` files, original WAV sources, configuration and small
 walking-character source are checked in under **`Examples/SpatialFabricShowcase`**.
+The showcase now has four separate demo rooms along a hallway: spatial motion,
+mono percussion, stereo groove and replay. It removes dummy speaker models and
+billboards while keeping real playback/OSC controls and a walkable collision floor.
 No symlink, local sandbox folder, MCP server, or external sample library is needed.
 
 From this repository root:

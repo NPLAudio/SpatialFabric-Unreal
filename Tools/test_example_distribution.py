@@ -14,7 +14,10 @@ from prepare_example import ROOT, EXAMPLE, prepare
 class ExampleDistributionTests(unittest.TestCase):
     def test_example_asset_inventory_and_dependency_closure(self):
         manifest = json.loads((EXAMPLE / 'ASSET_MANIFEST.json').read_text())
-        self.assertEqual(len(manifest['files']), 18)
+        self.assertEqual(len(manifest['files']), 16)
+        self.assertFalse((EXAMPLE / 'Content/SpatialFabricDemo/Textures').exists())
+        self.assertFalse((EXAMPLE / 'Content/SpatialFabricDemo/Materials/M_SF_Banner.uasset').exists())
+        self.assertFalse((EXAMPLE / 'Content/SpatialFabricDemo/Materials/M_SF_Driver.uasset').exists())
         actual = {p.relative_to(EXAMPLE).as_posix() for folder in ('Content', 'SourceAssets') for p in (EXAMPLE / folder).rglob('*') if p.is_file()}
         self.assertEqual(actual, {item['path'] for item in manifest['files']})
         for item in manifest['files']:

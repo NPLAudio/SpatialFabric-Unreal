@@ -28,7 +28,7 @@ class DemoToolingTests(unittest.TestCase):
             "validate_spatialfabric_demo.py", "capture_spatialfabric_osc.py",
             "begin_spatialfabric_handoff_check.py", "finish_spatialfabric_handoff_check.py",
             "demo_audio.py", "refresh_spatialfabric_demo_audio.py", "extend_spatialfabric_demo_floor.py",
-            "smoke_example.py",
+            "smoke_example.py", "room_layout.py", "rearrange_spatialfabric_demo_rooms.py", "publish_room_assets.py",
         ):
             with self.subTest(script=name):
                 path = ROOT / name

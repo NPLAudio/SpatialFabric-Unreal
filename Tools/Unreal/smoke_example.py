@@ -54,7 +54,7 @@ class ExampleSmoke:
                 self.check("all_inline", all(c.get_editor_property("sound_wave").get_editor_property("loading_behavior") == unreal.SoundWaveLoadingBehavior.FORCE_INLINE for c in components))
                 self.mover = next(a for a in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.StaticMeshActor) if a.get_actor_label() == "SF_Object_01")
                 self.initial = self.mover.get_actor_location()
-                self.pawn.set_actor_location(unreal.Vector(-4000, -4000, 300), False, True)
+                self.pawn.set_actor_location(unreal.Vector(-1480, -600, 210), False, True)
                 self.wait = time.monotonic()
                 self.phase = 1
             elif self.phase == 1 and time.monotonic() - self.wait > 0.25:
@@ -65,10 +65,22 @@ class ExampleSmoke:
                 landed = 40 < pos.z < 100 and not falling
                 # A newly spawned character may still report Walking before its first floor update.
                 if not landed and time.monotonic() - self.wait < 20: return
-                self.check("player_lands_on_outer_floor", landed, [pos.x, pos.y, pos.z])
-                self.pawn.set_actor_location(unreal.Vector(6200, -4000, pos.z), True, False)
+                self.check("player_lands_in_hall", landed, [pos.x, pos.y, pos.z])
+                self.pawn.set_actor_location(unreal.Vector(-2000, -600, pos.z), True, False)
                 pos = self.pawn.get_actor_location()
-                self.check("perimeter_blocks_capsule", pos.x < 5980, [pos.x, pos.y, pos.z])
+                self.check("hall_wall_blocks_capsule", pos.x > -1750, [pos.x, pos.y, pos.z])
+                clear = []
+                for y in (0, 1350, 2150, 2950):
+                    self.pawn.set_actor_location(unreal.Vector(-1450, y, 90), False, True)
+                    self.pawn.set_actor_location(unreal.Vector(-900, y, 90), True, False)
+                    clear.append(self.pawn.get_actor_location().x > -1100)
+                self.check("all_four_room_doors_pass_capsule", all(clear), clear)
+                self.pawn.set_actor_location(unreal.Vector(-650, 1350, 90), False, True)
+                self.pawn.set_actor_location(unreal.Vector(-650, 1950, 90), True, False)
+                self.check("room_divider_blocks_capsule", self.pawn.get_actor_location().y < 1750)
+                self.pawn.set_actor_location(unreal.Vector(-1480, 3200, 90), False, True)
+                self.pawn.set_actor_location(unreal.Vector(-1480, 3550, 90), True, False)
+                self.check("hall_end_blocks_capsule", self.pawn.get_actor_location().y < 3350)
                 self.check("sequence_animates", (self.mover.get_actor_location() - self.initial).length() > 5)
                 self.finish()
         except Exception:

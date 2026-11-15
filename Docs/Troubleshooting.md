@@ -101,7 +101,9 @@ changing source while an old DLL is loaded does not apply the fix.
 
 ## My player used to fall into the void
 
-The shipped example includes a 120 × 120 m solid outer floor and 3.5 m barriers.
+The room example has a continuous foundation, enclosed hallway/rooms and collision
+partitions. All four doors are checked with the actual walking capsule. Do not use
+the legacy outdoor-floor extender on this map; it now refuses room layouts.
 Use the floor updater for an older generated level. Its report must show nine
 blocking traces. Do not delete the foundation/collision or place the PlayerStart
 outside the enclosure. Engine fly/teleport cheats or custom movement can bypass
