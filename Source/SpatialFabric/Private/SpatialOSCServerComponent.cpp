@@ -5,6 +5,7 @@
 #include "SpatialOSCServerComponent.h"
 #include "SpatialFabricSettings.h"
 #include "SpatialFabricOSCReceiver.h"
+#include "SpatialFabricSceneQueryBridge.h"
 #include "OSCManager.h"
 #include "OSCAddress.h"
 #include "OSCTypes.h"
@@ -77,6 +78,7 @@ bool USpatialOSCServerComponent::IsListening() const
 
 void USpatialOSCServerComponent::HandleOSCMessage(const FOSCMessage& Message, const FString& IPAddress, uint16 Port)
 {
+	if (ISpatialFabricSceneQuery::Dispatch(Message, GetWorld(), IPAddress, Port)) return;
 	const FString AddressStr = UOSCManager::GetOSCAddressFullPath(Message.GetAddress());
 
 	float Value = 0.f;

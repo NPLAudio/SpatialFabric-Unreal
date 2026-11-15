@@ -13,6 +13,7 @@
 #include "AudioLoomOscSettings.h"
 #include "OSCManager.h"
 #include "SpatialFabricOSCReceiver.h"
+#include "SpatialFabricSceneQueryBridge.h"
 #include "OSCClient.h"
 #include "OSCMessage.h"
 #include "EngineUtils.h"
@@ -151,6 +152,16 @@ bool UAudioLoomOscSubsystem::IsListening() const
 	return Receiver && Receiver->IsListening();
 }
 
+FString UAudioLoomOscSubsystem::GetListenIP() const
+{
+	return Receiver && Receiver->IsListening() ? Receiver->GetIP() : FString();
+}
+
+int32 UAudioLoomOscSubsystem::GetListenPort() const
+{
+	return Receiver && Receiver->IsListening() ? Receiver->GetPort() : 0;
+}
+
 void UAudioLoomOscSubsystem::UpdateMonitoringTarget()
 {
 	const UAudioLoomOscSettings* Settings = GetDefault<UAudioLoomOscSettings>();
@@ -194,6 +205,7 @@ bool UAudioLoomOscSubsystem::IsPlayTrigger(const FOSCMessage& Message)
 
 void UAudioLoomOscSubsystem::HandleOSCMessage(const FOSCMessage& Message, const FString& IPAddress, uint16 Port)
 {
+	if (ISpatialFabricSceneQuery::Dispatch(Message, GetWorld(), IPAddress, Port)) return;
 	const FString AddressStr = UOSCManager::GetOSCAddressFullPath(Message.GetAddress());
 	FString Normalized = NormalizeOscAddress(AddressStr); // must match keys built in RebuildComponentRegistry
 

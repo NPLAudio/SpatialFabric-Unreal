@@ -19,6 +19,9 @@
 8. **[Codebase guide](CODEBASE_GUIDE.md)** — four modules, runtime data flow,
    threading/lifetime, source reading order and extension points.
 
+**[Scene query / discovery](SceneQuery.md)** — read-only JSON/OSC inventory,
+pagination and parsing, plus Python, Node.js, Max and Node-RED examples.
+
 ## Ready-made material
 
 - [Playable UE 5.8 source project](../Examples/SpatialFabricShowcase/README.md)

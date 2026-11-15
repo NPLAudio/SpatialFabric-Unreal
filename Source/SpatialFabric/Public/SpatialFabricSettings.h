@@ -76,6 +76,14 @@ public:
 	UPROPERTY(EditAnywhere, config, Category = "SpatialFabric")
 	bool bEnableDebugMessages = false;
 
+	/** Read-only scene discovery over existing OSC receivers. Does not start a listener. */
+	UPROPERTY(Config, EditAnywhere, Category = "Scene Discovery")
+	bool bEnableSceneQueries = true;
+
+	/** Opt in only on trusted networks. Replies always target the request sender's IPv4 address. */
+	UPROPERTY(Config, EditAnywhere, Category = "Scene Discovery")
+	bool bAllowRemoteSceneQueries = false;
+
 	// UDeveloperSettings overrides
 	virtual FName GetCategoryName() const override { return FName("Plugins"); }
 };

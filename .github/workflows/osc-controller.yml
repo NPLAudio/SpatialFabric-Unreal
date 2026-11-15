@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - 'Apps/OSCController/**'
+      - 'Examples/OSCSceneQuery/**'
       - '.github/workflows/osc-controller.yml'
   pull_request:
     paths:
       - 'Apps/OSCController/**'
+      - 'Examples/OSCSceneQuery/**'
       - '.github/workflows/osc-controller.yml'
   workflow_dispatch:
 
@@ -25,6 +27,12 @@ jobs:
       - name: Protocol, profile and actual loopback tests
         working-directory: Apps/OSCController
         run: python -m unittest discover -s tests -v
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Node scene client and host-wrapper examples
+        run: node --test Examples/OSCSceneQuery/test_scene_query.js
 
   portable-windows:
     runs-on: windows-latest

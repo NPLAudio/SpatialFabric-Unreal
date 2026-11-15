@@ -11,7 +11,10 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, simpledialog
 from .model import Cue, Profile, endpoint, load_profile, save_profile
 from .protocol import Message, parse_arguments, spatial_messages
-from .transport import Sender, Receiver
+from .transport import Sender
+from .receiver_hub import ReceiverHub, local_self_test, loopback_destination_status
+from .tracker_view import TrackerPanel
+from .scene_query import SceneQuerySession, RESPONSE
 
 BG, PANEL, TEXT, MUTED, CYAN, PURPLE, ORANGE = '#0b1426', '#14243c', '#eef5ff', '#a9c1d9', '#54d8f5', '#bf9aff', '#ffbf69'
 
@@ -19,12 +22,14 @@ BG, PANEL, TEXT, MUTED, CYAN, PURPLE, ORANGE = '#0b1426', '#14243c', '#eef5ff', 
 class Controller(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title('SpatialFabric OSC Controller — standalone')
+        self.title('SpatialFabric OSC Controller 1.2 — standalone')
         width, height = min(1240, self.winfo_screenwidth()-60), min(820, self.winfo_screenheight()-90)
         self.geometry(f'{width}x{height}'); self.minsize(980, 640); self.configure(bg=BG)
-        self.sender, self.receiver = Sender(), Receiver()
+        self.sender, self.receivers = Sender(), ReceiverHub()
+        self.scene_session = None; self.scene_origin_ip = None
         self.profile = Profile(); self.profile_path = None
-        self.records = deque(maxlen=1000); self.cue_states = {}; self.ghosts = {}
+        self.records = deque(maxlen=1000); self.log_rows = deque(); self.cue_states = {}; self.ghosts = {}
+        self.log_spatial = tk.BooleanVar(value=False)
         self.vars = {}; self.live = tk.BooleanVar(value=False); self.mute = tk.BooleanVar(value=False)
         self.status = tk.StringVar(value='Ready. No packets sent. Monitor is stopped.')
         self.monitor_status = tk.StringVar(value='Stopped — no socket bound')
@@ -47,6 +52,9 @@ class Controller(tk.Tk):
         style.configure('Stop.TButton', foreground=ORANGE, font=('Segoe UI', 10, 'bold'))
         style.configure('TEntry', fieldbackground=PANEL, foreground=TEXT, insertcolor=TEXT)
         style.configure('TCombobox', fieldbackground=PANEL, foreground=TEXT)
+        style.map('TCombobox', fieldbackground=[('readonly', PANEL)], foreground=[('readonly', TEXT)], selectbackground=[('readonly', PANEL)])
+        self.option_add('*TCombobox*Listbox.background', PANEL)
+        self.option_add('*TCombobox*Listbox.foreground', TEXT)
         style.configure('TNotebook', background=BG, borderwidth=0)
         style.configure('TNotebook.Tab', background=PANEL, padding=(20, 10))
         style.map('TNotebook.Tab', background=[('selected', '#24405f')], foreground=[('selected', CYAN)])
@@ -83,13 +91,19 @@ class Controller(tk.Tk):
         for name, width in [('playback_ip', 16), ('playback_port', 7)]:
             self.vars[name] = tk.StringVar(); ttk.Entry(endpoints, textvariable=self.vars[name], width=width).pack(side='left', padx=5)
         self._label(endpoints, 'Unreal: Start OSC in Playback first. UDP send ≠ confirmed delivery.', style='Muted.TLabel').pack(side='left', padx=12)
+        quick = ttk.Frame(self, padding=(18, 5)); quick.pack(fill='x')
+        ttk.Button(quick, text='Start all receivers (state + objects)', command=self.start_all_receivers).pack(side='left')
+        ttk.Button(quick, text='Diagnose same-PC OSC', command=self.diagnose).pack(side='left', padx=8)
+        self._label(quick, 'Explicit start only; never sends Play. Separate 9001 / 50018 / 9002 listeners.', style='Muted.TLabel').pack(side='left')
+        self.footer = ttk.Frame(self); self.footer.pack(side='bottom', fill='x')
+        ttk.Label(self.footer, textvariable=self.status, foreground=MUTED, padding=(18, 7), anchor='w').pack(side='left', fill='x', expand=True)
+        ttk.Button(self.footer, text='About / licenses', command=self.about).pack(side='right', padx=18, pady=(0, 6))
         notebook = ttk.Notebook(self); notebook.pack(fill='both', expand=True, padx=18, pady=12)
         cue_tab, spatial_tab, composer_tab, monitor_tab = [ttk.Frame(notebook, padding=14) for _ in range(4)]
         for frame, label in [(cue_tab, 'Cue transport'), (spatial_tab, 'Spatial / renderer'), (composer_tab, 'Message composer'), (monitor_tab, 'Monitor / log')]: notebook.add(frame, text=label)
+        self.tracker = TrackerPanel(notebook, self.start_tracker, self.stop_tracker, self.query_scene, self.import_discovered_cues)
+        notebook.insert(1, self.tracker, text='Object tracker')
         self._cue_tab(cue_tab); self._spatial_tab(spatial_tab); self._composer_tab(composer_tab); self._monitor_tab(monitor_tab)
-        footer = ttk.Frame(self); footer.pack(fill='x')
-        ttk.Label(footer, textvariable=self.status, foreground=MUTED, padding=(18, 7), anchor='w').pack(side='left', fill='x', expand=True)
-        ttk.Button(footer, text='About / licenses', command=self.about).pack(side='right', padx=18, pady=(0, 6))
 
     def _cue_tab(self, frame):
         self._label(frame, 'Select a cue, then send a transport command. No automatic playback on launch or profile load.', style='Muted.TLabel').pack(anchor='w', pady=(0, 12))
@@ -146,7 +160,8 @@ class Controller(tk.Tk):
         ttk.Button(controls, text='Export log…', command=self.export_log).pack(side='right')
         ttk.Button(controls, text='Clear', command=self.clear_log).pack(side='right', padx=6)
         ttk.Label(frame, textvariable=self.monitor_status, foreground=CYAN).pack(anchor='w', pady=10)
-        self._label(frame, '9001: playback state · 50018: ADM positions · 9002: example Custom output.\nOne listener per endpoint. Stop competing receivers first; this app never uses address reuse.', style='Muted.TLabel').pack(anchor='w', pady=(0, 10))
+        self._label(frame, '9001: playback state · 50018: ADM positions · 9002: example Custom output.\nTracker receivers run simultaneously; duplicate endpoints inside this app share a socket. Stop competing apps.', style='Muted.TLabel').pack(anchor='w', pady=(0, 10))
+        ttk.Checkbutton(frame, text='Log every spatial packet (off keeps high-rate tracking responsive)', variable=self.log_spatial).pack(anchor='w', pady=(0, 6))
         self.log = ttk.Treeview(frame, columns=('time', 'dir', 'peer', 'address', 'args'), show='headings', height=12)
         for key, label, width in [('time', 'Time', 85), ('dir', 'Type', 55), ('peer', 'Endpoint', 150), ('address', 'OSC address / message', 300), ('args', 'Typed arguments', 360)]:
             self.log.heading(key, text=label); self.log.column(key, width=width)
@@ -163,6 +178,11 @@ class Controller(tk.Tk):
         for name in ('front', 'right', 'up', 'gain', 'width'):
             try: data[name] = float(self.vars[name].get())
             except ValueError: raise ValueError(name + ' must be numeric') from None
+        data['tracker_ip'] = self.tracker.ip.get().strip()
+        data['tracker_ports'] = self.tracker.port_numbers()
+        data['query_ip'] = self.tracker.query_ip.get().strip()
+        try: data['query_port'] = int(self.tracker.query_port.get()); data['query_reply_port'] = int(self.tracker.reply_port.get())
+        except ValueError: raise ValueError('Query and reply ports must be integers') from None
         return Profile.from_dict(data)
 
     def _apply_profile(self, profile):
@@ -170,6 +190,10 @@ class Controller(tk.Tk):
         self.profile = profile; self.cue_states.clear(); self.ghosts.clear()
         for name in profile.__dataclass_fields__:
             if name in self.vars: self.vars[name].set(str(getattr(profile, name)))
+        self.tracker.ip.set(profile.tracker_ip)
+        self.tracker.ports.set(', '.join(str(p) for p in profile.tracker_ports))
+        self.tracker.query_ip.set(profile.query_ip); self.tracker.query_port.set(str(profile.query_port)); self.tracker.reply_port.set(str(profile.query_reply_port))
+        self.tracker.clear()
         self._refresh_cues(); self.spatial_dirty = False; self._draw_pad()
 
     def _refresh_cues(self):
@@ -184,9 +208,8 @@ class Controller(tk.Tk):
 
     def _record(self, kind, peer, address, args=''):
         record = (time.strftime('%H:%M:%S'), kind, peer, address, str(args)[:600])
-        self.records.append(record); self.log.insert('', 'end', values=record, tags=(kind,))
-        rows = self.log.get_children()
-        if len(rows) > 1000: self.log.delete(*rows[:len(rows)-1000])
+        self.records.append(record); self.log_rows.append(self.log.insert('', 'end', values=record, tags=(kind,)))
+        if len(self.log_rows) > 1000: self.log.delete(self.log_rows.popleft())
         self.log.yview_moveto(1)
 
     def _error(self, error):
@@ -303,38 +326,122 @@ class Controller(tk.Tk):
             self._send(ip, port, message)
         except (ValueError, OSError) as error: self._error(error)
 
+    def query_scene(self):
+        try:
+            ip, port = endpoint(self.tracker.query_ip.get().strip(), int(self.tracker.query_port.get()))
+            reply_port = int(self.tracker.reply_port.get())
+            session = SceneQuerySession(ip, port, reply_port, self._send)
+            targets = [endpoint(self.tracker.ip.get().strip(), reply_port, listen=True)]
+            if not self._confirm_targets(targets): return
+            self.receivers.start('scene', targets)
+            self.scene_session = session
+            self.tracker.scene_status.set('Querying scene; replies are paged JSON chunks. No audio or routing changes requested.')
+            session.tick(time.monotonic())
+        except (ValueError, OSError) as error: self._error(error)
+
+    def import_discovered_cues(self):
+        scene = self.tracker.scene
+        if scene is None: self._error(ValueError('Query the scene first')); return
+        try:
+            cues = {}; duplicates = 0
+            for row in scene['objects']:
+                if row['kind'] != 'playback': continue
+                cue = Cue((str(row.get('actor_label', row.get('name', 'Cue'))) + ' / ' + str(row.get('name', '')) )[:80], row.get('osc_base', ''))
+                cue.validate()
+                if cue.base in cues: duplicates += 1
+                else: cues[cue.base] = cue
+            if not cues: raise ValueError('No playback components found in this world')
+            if len(cues) > 64: raise ValueError('More than 64 distinct cue bases; choose a subset in a profile instead of silently truncating')
+            network = scene.get('playback_network', {})
+            port = network.get('bound_port') or network.get('configured_listen_port')
+            endpoint(self.scene_origin_ip, port)
+            if not messagebox.askyesno('Import discovered routing', f'Replace this app\'s cue list with {len(cues)} bases and set playback destination to {self.scene_origin_ip}:{port}?\n\nDuplicate bases merged: {duplicates}. No commands or Unreal configuration changes will be sent.', parent=self): return
+            data = self._current_profile().to_dict(); data['cues'] = [{'name':c.name,'base':c.base} for c in cues.values()]
+            data['playback_ip'] = self.scene_origin_ip; data['playback_port'] = port
+            self._apply_profile(Profile.from_dict(data)); self.tracker.set_scene(scene, self.scene_origin_ip, time.monotonic())
+            self.status.set('Discovered cues imported locally; live disabled; no commands sent. Save profile explicitly to persist.')
+        except (ValueError, OSError) as error: self._error(error)
+
+    def _tracker_targets(self):
+        return [endpoint(self.tracker.ip.get().strip(), p, listen=True) for p in self.tracker.port_numbers()]
+
+    def _confirm_targets(self, targets):
+        return not any(ip == '0.0.0.0' for ip, _ in targets) or messagebox.askyesno('All-interface listener', 'Listen on all IPv4 interfaces? OSC is unauthenticated; use trusted networks only.', parent=self)
+
+    def start_all_receivers(self):
+        try:
+            monitor = [endpoint(self.vars['monitor_ip'].get().strip(), int(self.vars['monitor_port'].get()), listen=True)]
+            tracking = self._tracker_targets()
+            if not self._confirm_targets(monitor + tracking): return
+            self.receivers.configure({'monitor': monitor, 'tracker': tracking})
+            self.cue_states.clear()
+            self.tracker.status.set('Tracking on ' + ', '.join(f'{ip}:{p}' for ip, p in tracking))
+            self.status.set('All receivers started. Unreal must send to these ports; playback commands still require its input receiver.')
+            self._record('INFO', '', 'Playback state and spatial receivers started; no Play sent')
+        except (ValueError, OSError) as error: self._error(error)
+
+    def start_tracker(self):
+        try:
+            targets = self._tracker_targets()
+            if not self._confirm_targets(targets): return
+            self.receivers.start('tracker', targets)
+            self.tracker.status.set('Tracking on ' + ', '.join(f'{ip}:{p}' for ip, p in targets))
+        except (ValueError, OSError) as error: self._error(error)
+
+    def stop_tracker(self):
+        self.receivers.stop_owner('tracker')
+        self.tracker.status.set('Tracker receivers stopped; shown positions are historical. Monitor listeners may remain active.')
+
+    def diagnose(self):
+        try:
+            ip = self.vars['playback_ip'].get().strip(); port = int(self.vars['playback_port'].get())
+            result = ['Isolated local UDP round-trip: ' + ('PASS' if local_self_test() else 'FAIL'), loopback_destination_status(ip, port),
+                      'App bound receivers: ' + (', '.join(f'{i}:{p}' for i,p in self.receivers.endpoints()) or 'NONE — click Start all receivers'),
+                      'Playback target ≠ monitor port. Unreal input is normally 9000; app receives on 9001 / 50018 / 9002.',
+                      'Unreal Editor Preferences → Performance → disable Use Less CPU when in Background.',
+                      'A bound port is not proof of the correct OSC application. No audio was triggered by this test.']
+            for line in result: self._record('INFO', '', line)
+            messagebox.showinfo('Same-PC OSC diagnostics', '\n\n'.join(result), parent=self)
+        except (ValueError, OSError) as error: self._error(error)
+
     def start_monitor(self):
         try:
             ip, port = endpoint(self.vars['monitor_ip'].get().strip(), int(self.vars['monitor_port'].get()), listen=True)
             if ip == '0.0.0.0' and not messagebox.askyesno('All-interface listener', 'Expose this unauthenticated monitor on all IPv4 interfaces? Use only a trusted network.', parent=self): return
-            bound = self.receiver.start(ip, port); self.cue_states.clear(); self.ghosts.clear()
-            self.monitor_status.set(f'Listening on {bound[0]}:{bound[1]} — exact bound endpoint')
-            self._record('INFO', f'{bound[0]}:{bound[1]}', 'Monitor started')
+            self.receivers.start('monitor', [(ip, port)]); self.cue_states.clear()
+            self._record('INFO', f'{ip}:{port}', 'Monitor started; spatial receivers unaffected')
         except (ValueError, OSError) as error:
-            self.monitor_status.set('Stopped — bind failed'); self._error(error)
+            self.monitor_status.set('Bind failed; previous listeners retained'); self._error(error)
 
     def stop_monitor(self):
-        self.receiver.stop(); self.monitor_status.set('Stopped — no socket bound')
+        self.receivers.stop_owner('monitor'); self.monitor_status.set('Monitor stopped; tracker listeners are independent')
         self._record('INFO', '', 'Monitor stopped; displayed states are historical')
 
     def _pump(self):
         now = time.monotonic()
-        configured_bases = {cue.base for cue in self.profile.cues}
-        for kind, received, peer, payload in self.receiver.poll():
+        for target, event in self.receivers.poll():
+            kind, received, peer, payload = event
             if kind == 'error': self.rejected += 1; self._record('ERR', f'{peer[0]}:{peer[1]}', payload); continue
-            self.rx += 1; self._record('RX', f'{peer[0]}:{peer[1]}', payload.address, self._args(payload))
-            if payload.address.endswith('/state') and len(payload.args) == 1 and payload.args[0][0] in ('f','i'):
-                value = payload.args[0][1]
-                base = payload.address[:-6]
-                if base in configured_bases and value in (0,1): self.cue_states[base] = (bool(value), received)
-            match = re.fullmatch(r'/adm/obj/([1-9]\d{0,9})/xyz', payload.address)
-            if match and len(payload.args) == 3 and all(tag in ('f','i','d') for tag,_ in payload.args):
-                right, front, _ = [v for _,v in payload.args]; self.ghosts[match[1]] = (front,right,received)
-                if len(self.ghosts) > 256: self.ghosts.pop(next(iter(self.ghosts)))
-                self._draw_pad()
-        if self.receiver.bound:
-            ip, port = self.receiver.bound
-            self.monitor_status.set(f'Listening on {ip}:{port} · RX {self.rx} · rejected {self.rejected} · queue drops {self.receiver.dropped}')
+            self._incoming(received, peer, payload, target[1])
+        if self.scene_session:
+            session = self.scene_session; session.tick(now)
+            if session.error:
+                self.tracker.scene_status.set(session.error); self._error(ValueError(session.error))
+                self.scene_session = None; self.receivers.stop_owner('scene')
+            elif session.done is not None:
+                self.scene_origin_ip = session.ip
+                self.tracker.set_scene(session.done, session.ip, now)
+                self.status.set(f'Scene query complete: {session.done["total"]} records from {session.ip}. Configuration snapshot only; no audio commands sent.')
+                self.scene_session = None; self.receivers.stop_owner('scene')
+            else:
+                received = len(session.assembler.chunks) if session.assembler else 0
+                self.tracker.scene_status.set(f'Querying scene: {len(session.objects)} records assembled; current page {received} chunks. No audio/configuration changes.')
+        self.tracker.refresh(now)
+        if self.receivers.endpoints():
+            endpoints = ', '.join(f'{ip}:{port}' for ip, port in self.receivers.endpoints())
+            self.monitor_status.set(f'Bound: {endpoints} · RX {self.rx} · rejected {self.rejected} · queue drops {self.receivers.dropped}')
+        else:
+            self.monitor_status.set('Stopped — no receive sockets bound; displayed data is historical')
         if now - self.last_pad_redraw > 1:
             self._draw_pad(); self.last_pad_redraw = now
         for i,cue in enumerate(self.profile.cues):
@@ -345,14 +452,35 @@ class Controller(tk.Tk):
             try: hz = int(self.vars['send_hz'].get())
             except ValueError: hz = 20
             if now-self.last_spatial >= 1/max(1,min(60,hz)): self.send_spatial(quiet=True)
-        self.pump_token = self.after(10, self._pump)  # GUI timers are best-effort; configured Hz is an upper bound.
+        self.pump_token = self.after(10, self._pump)
+
+    def _incoming(self, received, peer, payload, local_port):
+        configured_bases = {cue.base for cue in self.profile.cues}
+        self.rx += 1
+        if payload.address == RESPONSE:
+            if self.scene_session and local_port == self.scene_session.reply_port:
+                self.scene_session.accept(payload, peer[0], received)
+            return
+        tracked = self.tracker.model.ingest(payload, peer[0], local_port, received)
+        if not tracked or self.log_spatial.get():
+            self._record('RX', f'{peer[0]}:{peer[1]} → :{local_port}', payload.address, self._args(payload))
+        if payload.address.endswith('/state') and len(payload.args) == 1 and payload.args[0][0] in ('f','i'):
+            value = payload.args[0][1]
+            base = payload.address[:-6]
+            if base in configured_bases and value in (0,1): self.cue_states[base] = (bool(value), received)
+        match = re.fullmatch(r'/adm/obj/([1-9]\d{0,9})/xyz', payload.address)
+        if match and len(payload.args) == 3 and all(tag in ('f','i','d') for tag,_ in payload.args):
+            right, front, _ = [v for _,v in payload.args]; self.ghosts[match[1]] = (front,right,received)
+            if len(self.ghosts) > 256: self.ghosts.pop(next(iter(self.ghosts)))
+
 
     def load(self):
         path = filedialog.askopenfilename(parent=self, title='Load OSC profile', filetypes=[('JSON profiles','*.json')])
         if not path: return
         try:
             profile = load_profile(path)  # Validate before disturbing current state.
-            self.stop_monitor(); self._apply_profile(profile); self.profile_path = path
+            self.scene_session = None; self.receivers.stop_owner('scene')
+            self.stop_monitor(); self.stop_tracker(); self._apply_profile(profile); self.profile_path = path
             self.status.set('Profile loaded. Live disabled; monitor stopped; no packets sent.')
         except (ValueError, OSError) as error: self._error(error)
 
@@ -365,7 +493,7 @@ class Controller(tk.Tk):
         except (ValueError, OSError) as error: self._error(error)
 
     def clear_log(self):
-        self.records.clear(); self.log.delete(*self.log.get_children())
+        self.records.clear(); self.log_rows.clear(); self.log.delete(*self.log.get_children())
 
     def export_log(self):
         path = filedialog.asksaveasfilename(parent=self, title='Export bounded log', defaultextension='.csv', initialfile='osc-log.csv', filetypes=[('CSV','*.csv')])
@@ -381,7 +509,7 @@ class Controller(tk.Tk):
         text = tk.Text(window, wrap='word', bg=PANEL, fg=TEXT, font=('Consolas', 10), padx=16, pady=16)
         scroll = ttk.Scrollbar(window, command=text.yview); text.configure(yscrollcommand=scroll.set)
         scroll.pack(side='right', fill='y'); text.pack(fill='both', expand=True)
-        text.insert('end', 'SpatialFabric OSC Controller 1.0.0\nIndependent OSC control; not an audio player.\n\nUDP is unauthenticated and unacknowledged. Use trusted networks.\nClosing the controller does not stop remote audio.\n\n')
+        text.insert('end', 'SpatialFabric OSC Controller 1.2.0\nIndependent OSC control; not an audio player.\n\nUDP is unauthenticated and unacknowledged. Use trusted networks.\nClosing the controller does not stop remote audio.\n\n')
         root = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1]))
         paths = [root / 'LICENSE', root / 'THIRD_PARTY_NOTICES.md'] + sorted((root / 'runtime-licenses').glob('*'))
         for path in paths:
@@ -393,7 +521,7 @@ class Controller(tk.Tk):
         # Exiting is not a remote stop: do not send hidden transport requests.
         self.live.set(False)
         self.after_cancel(self.pump_token)
-        self.receiver.stop(); self.sender.close(); self.destroy()
+        self.receivers.close(); self.sender.close(); self.destroy()
 
 
 def main():
@@ -409,7 +537,7 @@ def main():
     if args.smoke_test:
         def smoke():
             report = {'status':'passed','mapped':bool(app.winfo_ismapped()),'cue_count':len(app.profile.cues),
-                      'live_enabled':app.live.get(),'listener_bound':app.receiver.bound,'tx':app.tx,'sender_open':app.sender.socket is not None}
+                      'live_enabled':app.live.get(),'listener_bound':app.receivers.endpoints() or None,'tx':app.tx,'sender_open':app.sender.socket is not None}
             if not report['mapped'] or not 1 <= report['cue_count'] <= 64 or report['live_enabled'] or report['listener_bound'] or report['tx'] or report['sender_open']: report['status']='failed'
             args.smoke_test.write_text(json.dumps(report,indent=2),encoding='utf-8'); app.close()
         app.after(1000, smoke)

@@ -37,6 +37,11 @@ class Profile:
     monitor_port: int = 9001
     spatial_ip: str = '127.0.0.1'
     spatial_port: int = 50018
+    tracker_ip: str = '127.0.0.1'
+    tracker_ports: list = field(default_factory=lambda: [50018, 9002])
+    query_ip: str = '127.0.0.1'
+    query_port: int = 8100
+    query_reply_port: int = 9011
     object_id: int = 1
     front: float = 0.0
     right: float = 0.0
@@ -52,6 +57,12 @@ class Profile:
         endpoint(self.playback_ip, self.playback_port)
         endpoint(self.spatial_ip, self.spatial_port)
         endpoint(self.monitor_ip, self.monitor_port, listen=True)
+        if not isinstance(self.tracker_ports, list) or not 1 <= len(self.tracker_ports) <= 8: raise ValueError('Choose 1..8 tracker ports')
+        for port in self.tracker_ports: endpoint(self.tracker_ip, port, listen=True)
+        if len(set(self.tracker_ports)) != len(self.tracker_ports): raise ValueError('Duplicate tracker ports')
+        endpoint(self.query_ip, self.query_port)
+        endpoint(self.tracker_ip, self.query_reply_port, listen=True)
+        if self.query_reply_port < 1024: raise ValueError('Query reply port must be >=1024')
         if type(self.object_id) is not int or not 1 <= self.object_id <= 99999: raise ValueError('Object ID must be 1..99999')
         if type(self.send_hz) is not int or not 1 <= self.send_hz <= 60: raise ValueError('Send rate must be 1..60 Hz')
         for name, lo, hi in [('front', -1, 1), ('right', -1, 1), ('up', -1, 1), ('gain', 0, 2), ('width', 0, 1)]:

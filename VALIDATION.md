@@ -22,10 +22,18 @@ This builds the plugin for **Editor, Development, and Shipping**, creates a temp
 project outside the plugin, loads the built plugin, runs all `SpatialFabric*` native
 regressions with NullRHI/NoSound, and checks the JSON report for failures, skipped tests,
 or an empty test suite. It never opens or saves SpatialSandbox's level/config files.
-Latest UE 5.8 Win64 evidence: `SpatialFabricValidation-7d4mvdvu`, **26 tests passed**,
-zero failed/skipped; Editor/Development/Shipping builds passed. Fast Python checks:
-**22 passed** (including procedural sound design, example inventory/preparation,
-document links and PowerPoint timing/notes/package checks).
+Latest UE 5.8 Win64 evidence: `SpatialFabricValidation-75jueelv`, **29 tests passed**,
+zero failed/skipped; Editor/Development/Shipping builds passed. This includes
+read-only scene inventory/pagination/Unicode chunks and Playback endpoint widths
+at 1×/1.5×/2× layout scales. Earlier evidence: `7d4mvdvu` (26, full builds) and
+`c9brhrzz` (27, editor-only UI iteration).
+
+The controller has **35 passing tests** (30 core + 5 desktop GUI); the Node scene
+client/examples have **4 passing tests**, including actual UDP paging and host-API
+stubs for Node-RED/Max wrappers. Max/Node-RED application UIs were not launched.
+Of the root Tools checks, **20 pass**; two presentation/document checks are currently
+blocked because the existing `Presentations/` folder is missing from the working
+tree. That unrelated deletion was not restored or included as a scene-query change.
 Logs, the built plugin, and the test report remain in the printed temporary directory.
 Use `--editor-only` for iteration, or `--output` with a new empty directory to retain
 named evidence. Output directories inside the source plugin are rejected.
@@ -68,6 +76,24 @@ missing-device failure were exercised, and no authored stage motion occurred.
 Physical listening/capture, latency, the full editor workflow matrix, and packaged
 codec playback remain unverified. Evidence stays in the sandbox's
 `Saved/SpatialFabricDemo/` directory and is not plugin Git content.
+
+## Scene discovery live evidence
+
+Python and dependency-free Node clients queried the real Editor through **8100 and
+9000**, assembling **13 records over four pages**: 3 playback components, 4 spatial
+bindings, Manager/stage/listener and spatial components. The tracker GUI received
+20 chunks for a default-size page, displayed 4 explicitly labelled Scene snapshot
+positions, kept the configured cues unchanged and released its temporary reply
+listener. The confirmed-import test sends no transport commands.
+
+Live PIE and paused PIE queries also passed through both inputs. Paused responses
+reported identical frozen world time and the PIE world path; all cues remained
+stopped. Reports are local under `SpatialSandbox/Saved/SpatialFabricDemo/`:
+`scene_query_live_validation.json`, `scene_query_tracker_gui.json`. Sample JSON in
+Examples is illustrative and contains no local hardware identifiers. Native tests
+also check that querying does not synthesize/cache actor labels or start servers/audio.
+These checks do not certify physical devices, packaged runtime networking, Mac/Linux
+hardware, or every Max/Node-RED version. See [the command contract](Docs/SceneQuery.md).
 
 ## Published example and presentation evidence
 

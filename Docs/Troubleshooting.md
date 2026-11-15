@@ -124,6 +124,17 @@ setting is a ceiling, not a metronome; an output-latency diagnostic of zero mean
 unavailable data here, not measured zero delay. Check foreground/background behavior
 before interpreting a low editor-FPS display as an audio sample-rate problem.
 
+For an external controller on the same PC, open **Edit → Editor Preferences**,
+search **Use Less CPU when in Background** (General / Performance), and uncheck it.
+This is `bThrottleCPUWhenNotForeground=False` in EditorPerformanceSettings. It costs
+more CPU/GPU/power but avoids focus-related editor/PIE slowdown. Keep viewport
+Realtime enabled or use PIE for animation; this is not an audio latency guarantee.
+
+The [standalone controller](../Apps/OSCController/README.md) now has simultaneous
+state/ADM/Custom receivers, same-PC diagnostics and a multi-view Object tracker.
+Unreal must still **Start OSC** on its Playback input (normally 9000). Starting an
+app monitor on 9001 does not start the Unreal input receiver.
+
 ## Missing modules, classes or example assets
 
 - Build with matching UE 5.8/toolchain; do not reuse arbitrary old DLLs.

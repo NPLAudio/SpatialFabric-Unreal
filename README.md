@@ -27,6 +27,7 @@ Stage, Objects, Radar, Output and Playback.
 | Add the plugin to a show/project | [Getting started](Docs/GettingStarted.md) |
 | Send positions to an external renderer | [Spatial routing](Docs/SpatialRouting.md) |
 | Play cues to a device/channel | [Audio playback and CSV](Docs/AudioPlayback.md) |
+| Query scene configuration as JSON/OSC | [Scene query command and examples](Docs/SceneQuery.md) |
 | Use a standalone OSC desktop controller | [OSC Controller app](Apps/OSCController/README.md) |
 | Connect a controller or inspect packets | [OSC reference](Docs/OSCReference.md) |
 | Find out why something is silent/invisible | [Troubleshooting](Docs/Troubleshooting.md) |

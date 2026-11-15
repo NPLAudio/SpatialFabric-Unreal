@@ -1,5 +1,9 @@
 # Examples
 
+- [OSC scene query](OSCSceneQuery/README.md): read-only JSON inventory, command-line
+  Python/Node.js, Node for Max wrapper, importable Node-RED flow, sample JSON/schema.
+
+
 ## [SpatialFabricShowcase](SpatialFabricShowcase/README.md)
 
 A UE 5.8 source project with the actual showcase map, 15 Unreal asset packages,

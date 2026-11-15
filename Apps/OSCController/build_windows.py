@@ -1,6 +1,7 @@
 """Build a portable Windows app with bundled Python/Tk and retained runtime notices.
 Run using Python 3.13 after installing requirements-build.txt in a virtual environment.
 """
+import argparse
 from importlib.metadata import distribution
 from pathlib import Path
 import shutil
@@ -19,6 +20,9 @@ NAME = 'SpatialFabricOSCController'
 def main():
     if sys.platform != 'win32': raise SystemExit('Build the Windows executable on Windows; source runs separately with Python/Tk.')
     if struct.calcsize('P') != 8: raise SystemExit('Use a 64-bit Python interpreter for the Windows-x64 package.')
+    parser = argparse.ArgumentParser(__doc__)
+    parser.add_argument('--output-dir', type=Path, default=ROOT / 'dist', help='Separate versioned output avoids replacing a running older executable')
+    output_dir = parser.parse_args().output_dir.resolve(); output_dir.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix=NAME + '-build-') as temporary:
         work = Path(temporary)
         notices = work / 'runtime-licenses'; notices.mkdir()
@@ -40,18 +44,18 @@ def main():
                         '--name', NAME, '--icon', str(ROOT / 'assets/controller.ico'), '--add-data', str(ROOT / 'assets') + ';assets',
                         '--add-data', str(notices) + ';runtime-licenses', '--add-data', str(ROOT / 'LICENSE') + ';.',
                         '--add-data', str(ROOT / 'THIRD_PARTY_NOTICES.md') + ';.',
-                        '--distpath', str(ROOT / 'dist'), '--workpath', str(work / 'work'), '--specpath', str(work),
+                        '--distpath', str(output_dir), '--workpath', str(work / 'work'), '--specpath', str(work),
                         str(ROOT / 'launch.py')], cwd=ROOT, check=True)
-        portable = ROOT / 'dist' / NAME; portable.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(ROOT / 'dist' / (NAME + '.exe'), portable)
+        portable = output_dir / NAME; portable.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(output_dir / (NAME + '.exe'), portable)
         for name in ('README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md'): shutil.copy2(ROOT / name, portable)
         shutil.copytree(ROOT / 'profiles', portable / 'profiles', dirs_exist_ok=True)
         shutil.copytree(notices, portable / 'runtime-licenses', dirs_exist_ok=True)
-        archive = ROOT / 'dist' / (NAME + '-Windows-x64.zip')
+        archive = output_dir / (NAME + '-Windows-x64.zip')
         with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as output:
             for path in sorted(portable.rglob('*')):
                 if path.is_file(): output.write(path, path.relative_to(portable.parent))
-        print('\nExecutable:', ROOT / 'dist' / (NAME + '.exe'))
+        print('\nExecutable:', output_dir / (NAME + '.exe'))
         print('Portable ZIP:', archive)
 
 

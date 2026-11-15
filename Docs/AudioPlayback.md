@@ -107,7 +107,12 @@ rate/layout and latency verification remain in [VALIDATION.md](../VALIDATION.md)
 
 ## OSC control and monitoring
 
-Playback has its own **Start OSC / Stop OSC**, listen port and monitoring destination.
+Playback has its own **Start OSC / Stop OSC**, listen IP/port and monitoring destination.
+The OSC section separates **Incoming — cue triggers** from **Outgoing — playback
+state monitoring**. Labels sit above full-width IP and five-digit port editors;
+fields/buttons wrap onto additional rows in a narrow dock rather than squeezing
+numbers. Hover an endpoint for its complete value. Restart OSC after changing the
+incoming binding; editing settings is not proof that the running socket rebound.
 Defaults: incoming `127.0.0.1:9000`, state destination `127.0.0.1:9001`.
 Configuration remains in `DefaultEngine.ini` under
 `[/Script/AudioLoom.AudioLoomOscSettings]`.

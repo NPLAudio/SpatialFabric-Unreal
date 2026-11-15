@@ -22,8 +22,12 @@ control data; direct playback supplies samples to OS devices. There is no inferr
 renderer-input/channel association between components on the same actor.
 
 `Source/Shared/SpatialFabricOSCReceiver.h` is a shared private include, not another
-module or reflected class. Both independent runtime modules use it without an
-AudioLoom↔SpatialFabric dependency cycle. `Examples/SpatialFabricShowcase/Source`
+module or reflected class. Both runtime modules use it without a dependency cycle.
+Scene discovery now gives SpatialFabric a private, one-way dependency on AudioLoom
+for typed read-only inventory. AudioLoom dispatches query requests through the
+Core-only `SpatialFabricSceneQueryBridge.h` modular-feature interface, not a reverse
+module dependency. The versioned command/local JSON API is implemented in
+`SpatialSceneQuery.cpp` / `SpatialSceneQueryLibrary.h`; see [scene query](SceneQuery.md). `Examples/SpatialFabricShowcase/Source`
 is a separate original host-project module, not part of the plugin's four modules.
 
 ## Spatial frame pipeline

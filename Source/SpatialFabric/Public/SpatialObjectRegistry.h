@@ -46,6 +46,9 @@ public:
 		const TArray<FSpatialObjectBinding>& Bindings,
 		ASpatialStageVolume* Stage) const;
 
+	/** Read-only world-scoped resolution, shared by routing and discovery (no asset loading). */
+	AActor* ResolveBoundActor(const FSpatialObjectBinding& Binding) const { return ResolveActor(Binding.TargetActor, Binding.CachedActorLabel); }
+
 private:
 	/** Attempt to resolve a soft actor pointer by label in the owning world. */
 	AActor* ResolveActor(const TSoftObjectPtr<AActor>& SoftPtr,

@@ -44,6 +44,13 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "AudioLoom|OSC")
 	bool IsListening() const;
 
+	/** Actual bound endpoint, not settings that may have changed since StartListening. */
+	UFUNCTION(BlueprintPure, Category = "AudioLoom|OSC")
+	FString GetListenIP() const;
+
+	UFUNCTION(BlueprintPure, Category = "AudioLoom|OSC")
+	int32 GetListenPort() const;
+
 	/** Conservative all-interface UI probe. StartListening's exact configured-IP bind is authoritative. */
 	UFUNCTION(BlueprintCallable, BlueprintPure, Category = "AudioLoom|OSC")
 	static bool IsPortAvailable(int32 Port);

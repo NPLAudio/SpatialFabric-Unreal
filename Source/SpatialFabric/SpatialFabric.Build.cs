@@ -27,6 +27,8 @@ public class SpatialFabric : ModuleRules
 			"Slate",
 			"SlateCore",
 			"InputCore",
+			"Json",
+			"AudioLoom", // Typed read-only inventory; AudioLoom uses a Core-only modular-feature bridge back.
 		});
 	}
 }

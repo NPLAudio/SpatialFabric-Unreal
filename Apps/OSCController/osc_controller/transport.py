@@ -40,6 +40,7 @@ class Receiver:
             # Never use reuse; on Windows also protect our binding from later reuse binds.
             if hasattr(socket, 'SO_EXCLUSIVEADDRUSE'):
                 sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1024 * 1024)
             sock.bind(address); sock.settimeout(0.1)
         except Exception:
             sock.close(); raise

@@ -40,6 +40,7 @@ Docs/*
 !Docs/GettingStarted.md
 !Docs/SpatialRouting.md
 !Docs/OSCReference.md
+!Docs/SceneQuery.md
 !Docs/Troubleshooting.md
 !Docs/Development.md
 

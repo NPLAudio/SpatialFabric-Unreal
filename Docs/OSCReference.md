@@ -9,6 +9,16 @@ cue Play/Stop/Loop, worker-state monitoring, direct ADM renderer controls and a 
 message composer. It runs without Unreal and never auto-sends on startup. Its spatial
 pad controls a renderer directly; it does not remotely move Unreal actors.
 
+## Read-only scene discovery
+
+Send `/spatialfabric/scene/query` with OSC `,siii` (request ID, reply port, offset,
+limit) to a running spatial input (8100) or Playback input (9000). Replies use
+`/spatialfabric/scene/response ,siis`: ID, zero-based chunk index, chunk count,
+JSON fragment. Reassemble a full page before parsing, then follow `next_offset`.
+Loopback is enabled by default; remote discovery requires explicit opt-in.
+See the [complete v1 contract](SceneQuery.md) and
+[Python / Node.js / Max / Node-RED examples](../Examples/OSCSceneQuery/README.md).
+
 ## Ports: inputs and destinations are different
 
 | Path | Default IP:port | Direction relative to Unreal |

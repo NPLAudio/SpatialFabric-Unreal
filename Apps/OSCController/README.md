@@ -1,4 +1,4 @@
-# SpatialFabric OSC Controller
+# SpatialFabric OSC Controller 1.2
 
 A **separate desktop application**, not an Unreal plugin or editor panel. It sends
 OSC/UDP to SpatialFabric or another OSC device, and monitors incoming messages.
@@ -9,7 +9,9 @@ account, or third-party OSC library is required.
 
 After building, double-click **`dist/SpatialFabricOSCController.exe`**. The companion
 `dist/SpatialFabricOSCController-Windows-x64.zip` is the portable distribution:
-extract it and run the executable inside. Python and Tcl/Tk are bundled; recipients
+extract it and run the executable inside. A version-separated local build may be
+under **`dist/1.2.0/SpatialFabricOSCController.exe`**; check About for version 1.2.
+Python and Tcl/Tk are bundled; recipients
 do not need to install Python. Keep the included license notices when sharing.
 
 This is an unsigned local executable: Windows may show an unsigned-app warning.
@@ -39,8 +41,12 @@ validated. There is no audio driver/backend in the controller.
    Begin with a low hardware level. The app cannot inspect your physical patch.
 2. In **Spatial Fabric → Playback**, start the OSC receiver. Its default input is
    **127.0.0.1:9000**. This app's playback destination must match.
-3. In the app, select **Monitor / log → Start monitor**. The default listen endpoint
-   is **127.0.0.1:9001**. Unreal's playback Send IP/Port must point here.
+3. In the app, click **Start all receivers (state + objects)**. This starts
+   **127.0.0.1:9001** for playback state and **50018 / 9002** for spatial tracking
+   simultaneously. Unreal's playback Send IP/Port must point to 9001. No Play is sent.
+   Use **Diagnose same-PC OSC** to test an isolated loopback round-trip and check
+   whether the configured Unreal input appears bound. A successful send alone is
+   not a connection test.
 4. Return to **Cue transport**, select a cue and press **Play**. Play sends numeric
    float `1`; Stop is address-only; Loop ON/OFF sends float `1`/`0`.
 5. Press **Stop All Configured Cues** before leaving a show. It sends one Stop per
@@ -88,13 +94,76 @@ change stage transforms, or spatialize AudioLoom PCM. Unreal's spatial input on
 - **Center pad** disables live and centers locally. It deliberately sends nothing
   until Send once or live is re-enabled. Live is never persisted in profiles.
 - Monitor port 50018 to see received ADM objects as purple outlines (expire after
-  10 seconds). Monitoring 9001 instead receives playback state. One receiver port
-  is active at a time. Receiving positions does not automatically retransmit them.
+  10 seconds). The dedicated Object tracker below offers more views. Playback
+  monitoring on 9001 remains active alongside the spatial receivers. Receiving
+  positions never automatically retransmits them.
 
 **Avoid competing writers:** Unreal and this app can both send to a renderer.
 Disable the unwanted sender or give each a separate object-ID range. If you listen
 on the same endpoint you send to, the monitor may display your own datagrams;
 that is not a renderer reply.
+
+## Object tracker — receive only
+
+Click **Start tracking** in the Object tracker tab, or **Start all receivers** in
+its top toolbar. Default spatial inputs are 50018 (ADM) and 9002 (example Custom).
+Playback state on 9001 can run simultaneously. Exact duplicate endpoints inside
+this app share one socket rather than competing for the port. A failed multi-port
+start preserves existing listeners and releases newly created partial bindings.
+Stopping one owner does not close a socket still needed by the other owner.
+
+Views include **top, front, side, fixed isometric 3D, polar/AED and XYZ history**.
+Trails, ADM/Custom filtering, per-object isolation, Fit Received, coordinate tables,
+name/gain/width/mute, last-position age and observed position-update rate help debug
+routing. The fixed isometric view is a projection, not a full orbit-camera renderer.
+The tracker does not fabricate motion or forward incoming messages to Unreal.
+
+ADM `/adm/obj/{id}/xyz` and `/aed` are supported, plus metadata. XYZ takes priority
+while recently present so Both mode does not double-count rate or history. The
+example Custom `/demo/{zone}/{id}/xyz` uses stage-normalized front/right/up. Generic
+Custom templates/ranges are **not automatically inferred**. ADM and Custom values
+may differ because ADM sphere-limits its position; they are not silently paired.
+Sources are keyed by protocol, sender IP, local port and object ID. Different
+senders on the same IP and receive port with the same ID cannot be distinguished.
+
+At most 256 objects, 240 history samples per object and 32 displayed objects keep
+rendering bounded. Select an object for a clear view when labels overlap. Old dots
+are dimmed, not treated as a disconnected device: send-on-change sources can be
+quiet while their last position remains valid. Start playback/PIE or otherwise
+change an object if a late-starting tracker has missed the sender's initial state.
+Rendering is capped near 20 Hz; the worker receives independently. Spatial packet
+logging defaults off to avoid flooding the UI; turn it on in Monitor / log if needed.
+
+## Query scene configuration from Unreal
+
+In **Object tracker**, use **Query scene** (query IP/port default 127.0.0.1:8100;
+reply port 9011). A running Playback input on 9000 also accepts this command. It
+retrieves versioned JSON through bounded, correlated OSC chunks, retries timeouts,
+and follows pages. Reply binding uses the tracker Listen IP. The temporary query
+receiver shares exact duplicate endpoints and does not interrupt live tracking.
+
+The **Scene inventory** view shows complete JSON (preview capped at 256 KiB; Export
+JSON saves everything). **Scene** dots show explicitly labelled query snapshots,
+not fabricated live OSC telemetry. **Import discovered cues…** confirms before
+replacing the app cue list/playback destination; it never changes Unreal routing
+or plays audio. Querying alone does not replace cues. Save a profile explicitly.
+Failed/incomplete queries preserve the previous complete inventory. More than 64
+distinct cue bases must be reduced deliberately instead of being silently truncated.
+
+Remote discovery is disabled by default in Unreal; explicit trusted-network opt-in
+is required. The response describes configuration/software state, not device
+presence or physical audio. See [command/schema](../../Docs/SceneQuery.md) and
+[runnable Max/Node-RED/Python/Node examples](../../Examples/OSCSceneQuery/README.md).
+
+## Unreal losing frame rate when the controller has focus
+
+In **Edit → Editor Preferences**, search **Use Less CPU when in Background**
+(General / Performance) and uncheck it. The underlying setting is
+`bThrottleCPUWhenNotForeground=False` in EditorPerformanceSettings. This keeps
+editor/PIE processing responsive while the controller is focused; it uses more
+CPU/GPU and power. Also keep the viewport realtime or run PIE for animation.
+It is an editor preference, not a packaged-game setting or a latency guarantee.
+Do not disable every Slate throttle or force an unlimited frame rate unnecessarily.
 
 ## Message composer
 
@@ -115,7 +184,8 @@ as Python or shell code. There is no automatic repeat.
 ## Monitor and network safety
 
 Default listen address is literal loopback. Binding verifies the real socket and
-fails if another receiver owns the endpoint; address reuse is never enabled.
+fails if another application owns the endpoint; address reuse is never enabled.
+The app internally shares duplicate endpoints between tracker and monitor.
 Stop other capture/controller programs if port 9001/50018/9002 is already occupied.
 Changing the listen fields does not rebind an active socket: press Start monitor
 to restart. The displayed bound endpoint remains authoritative.
@@ -128,7 +198,7 @@ authentication, encryption or guaranteed delivery. Never expose it to the Intern
 
 Incoming messages support `i/f/s/b/h/d/T/F/N` and bounded bundles; timetags are
 **not scheduled**. Unsupported tags, malformed padding/lengths, non-finite numbers,
-overdeep bundles and oversized packets reject the whole datagram. The event queue
+overdeep bundles and oversized packets reject the whole datagram. Each listener's event queue
 is bounded to 2048; the log retains only the latest 1000 records. Excess events
 are dropped and counted rather than growing memory indefinitely. Export CSV is
 explicit; logs are not written automatically. The monitor does not authenticate
@@ -137,8 +207,9 @@ senders: reported state may be spoofed on an untrusted network.
 ## Profiles
 
 Load/Save JSON explicitly; see `profiles/spatialfabric-showcase.json`. Profiles
-store endpoints, cue names/bases and spatial settings. They contain no credentials
-and never store live-enabled or listener-running state. Validation occurs before
+store endpoints, cue names/bases and spatial settings. They also store tracker receive IP/ports. Old 1.0 profiles still load using default
+tracker settings. They contain no credentials and never store live-enabled or
+listener-running state. Validation occurs before
 application; invalid profiles do not replace settings. Saving uses atomic replace.
 The composer and last-reported state are intentionally not persisted.
 
@@ -150,6 +221,8 @@ On Windows, use a regular **64-bit Python 3.13 with Tk**:
 py -3.13 -m venv .venv
 .venv\Scripts\python -m pip install -r requirements-build.txt
 .venv\Scripts\python build_windows.py
+# Avoid overwriting an older executable that is still open:
+.venv\Scripts\python build_windows.py --output-dir dist/1.2.0
 ```
 
 Builds run the protocol/profile/UDP tests, use PyInstaller, bundle Python/Tk and
@@ -169,9 +242,12 @@ python -m unittest discover -s tests -v
 dist\SpatialFabricOSCController.exe --smoke-test "$env:TEMP\osc-smoke.json"
 ```
 
-Local validation: Windows 11 x64, Python 3.13.14 / Tk 8.6; **14 core tests and
-3 interactive GUI tests passed**. The bundled Windows executable also passed its
-no-network startup smoke check. Physical hardware integration remains unverified.
+Local validation: Windows 11 x64, Python 3.13.14 / Tk 8.6; **30 core tests and
+5 interactive GUI tests passed**, including paged scene queries and confirmed cue
+import without transport commands. A live Unreal loopback Loop-control check restored
+the original value without starting audio. A separate eight-second live tracker
+check received **8,474 messages / 8 ADM+Custom objects**, about 30 position updates/s
+while Unreal was unfocused. Physical hardware integration remains unverified.
 
 Tests cover wire bytes, bounded/atomic parsing, profiles, socket ownership,
 loopback sending/receiving and opt-in UI transport/composer behavior. Startup smoke
