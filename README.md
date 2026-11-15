@@ -16,7 +16,6 @@ Stage, Objects, Radar, Output and Playback.
 
 [MIT license](LICENSE) · [Documentation](Docs/README.md) ·
 [Playable example](Examples/SpatialFabricShowcase/README.md) ·
-[Sound-designer presentation](Presentations/README.md) ·
 [Validation and limits](VALIDATION.md)
 
 ## Choose your starting point
@@ -32,7 +31,7 @@ Stage, Objects, Radar, Output and Playback.
 | Connect a controller or inspect packets | [OSC reference](Docs/OSCReference.md) |
 | Find out why something is silent/invisible | [Troubleshooting](Docs/Troubleshooting.md) |
 | Build, test or extend the code | [Development](Docs/Development.md) and [codebase guide](Docs/CODEBASE_GUIDE.md) |
-| Present the system to sound designers | [15-minute talk + 10-minute demo](Presentations/README.md) |
+| Download/install a release | [Release artifacts and notes](RELEASE_NOTES.md) |
 
 ## Requirements and honest support status
 
@@ -53,10 +52,12 @@ Native Editor/Development/Shipping compilation does **not** certify physical aud
 channels, exclusive mode, latency, all interfaces, or cooked codec playback.
 See [remaining release gates](VALIDATION.md).
 
-The plugin-only release ZIP intentionally omits the example, deck and standalone apps. Use the
-complete GitHub repository for those files, or the companion example ZIP when a
-release provides it. Release automation is configured to attach the example/deck;
-a push to main alone does not create a release or version tag.
+The plugin-only release ZIP intentionally omits the example and standalone apps.
+Releases also provide a standalone source-example ZIP, complete-source ZIP and
+portable Windows controller ZIP, with a commit manifest and SHA-256 checksums.
+The retired presentation is available in the historical
+[2.0.3 release](https://github.com/NPLAudio/SpatialFabric/releases/tag/v2.0.3), not this release.
+A push to main alone does not create a release or version tag.
 
 ## Install into your project
 
@@ -151,8 +152,9 @@ cue player patched straight to an interface. A buffering worker keeps audio movi
 while the editor draws the next frame; that separation does not make the entire
 system sample-accurate or remove driver, converter and network delays.
 
-The [presentation](Presentations/README.md) explains the complete path with diagrams,
-timed speaker notes, a ten-minute demo and Q&A prompts.
+The operator guides explain both paths; the room example and scene-query tools
+provide a practical walkthrough. Older presentation materials remain in the
+[2.0.3 release archive](https://github.com/NPLAudio/SpatialFabric/releases/tag/v2.0.3).
 
 ## Validation
 
@@ -162,7 +164,7 @@ python Tools/validate_unreal.py --engine "C:/Program Files/Epic Games/UE_5.8"
 ```
 
 The native runner builds disposable copies and judges Unreal's JSON report, not
-exit code alone. Current evidence includes **26 native regressions**, Win64
+exit code alone. Current evidence includes **29 native regressions**, Win64
 Editor/Development/Shipping builds, live editor/PIE checks and real UDP capture.
 The published example has separate compilation and silent PIE smoke coverage.
 Exact commands, evidence and exclusions are in [VALIDATION.md](VALIDATION.md).
@@ -175,7 +177,7 @@ Exact commands, evidence and exclusions are in [VALIDATION.md](VALIDATION.md).
 - `Examples/SpatialFabricShowcase`: runnable example assets/project/source audio.
 - `Tools`: validation, preparation, branding and editor automation.
 - `Docs`: current operator/developer guides; `AUDIT.md` is a **historical pre-fix** report.
-- `Presentations`: editable deck, presenter guide and demo run sheet.
+- `RELEASE_NOTES.md`: artifact selection, installation and current release limits.
 
 ## License and support
 

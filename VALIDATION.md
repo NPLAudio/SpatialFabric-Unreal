@@ -22,7 +22,7 @@ This builds the plugin for **Editor, Development, and Shipping**, creates a temp
 project outside the plugin, loads the built plugin, runs all `SpatialFabric*` native
 regressions with NullRHI/NoSound, and checks the JSON report for failures, skipped tests,
 or an empty test suite. It never opens or saves SpatialSandbox's level/config files.
-Latest UE 5.8 Win64 evidence: `SpatialFabricValidation-75jueelv`, **29 tests passed**,
+Release 2.1.0 UE 5.8 Win64 evidence: `SpatialFabricValidation-qedke7lh`, **29 tests passed**,
 zero failed/skipped; Editor/Development/Shipping builds passed. This includes
 read-only scene inventory/pagination/Unicode chunks and Playback endpoint widths
 at 1×/1.5×/2× layout scales. Earlier evidence: `7d4mvdvu` (26, full builds) and
@@ -31,10 +31,10 @@ at 1×/1.5×/2× layout scales. Earlier evidence: `7d4mvdvu` (26, full builds) a
 The controller has **35 passing tests** (30 core + 5 desktop GUI); the Node scene
 client/examples have **4 passing tests**, including actual UDP paging and host-API
 stubs for Node-RED/Max wrappers. Max/Node-RED application UIs were not launched.
-Of the root Tools checks, **24 pass** (including four room-plan geometry/navigation
-checks); two presentation/document checks are currently
-blocked because the existing `Presentations/` folder is missing from the working
-tree. That unrelated deletion was not restored or included as a scene-query change.
+Release Tools checks: **29 pass**, including room geometry/navigation, asset and
+document links, retired-presentation/release contract, and safe archive/checksum
+packaging. The removed presentation was deliberately not restored; the obsolete
+deck-content test is replaced with the current release contract and archival link.
 Logs, the built plugin, and the test report remain in the printed temporary directory.
 Use `--editor-only` for iteration, or `--output` with a new empty directory to retain
 named evidence. Output directories inside the source plugin are rejected.
@@ -96,12 +96,14 @@ also check that querying does not synthesize/cache actor labels or start servers
 These checks do not certify physical devices, packaged runtime networking, Mac/Linux
 hardware, or every Max/Node-RED version. See [the command contract](Docs/SceneQuery.md).
 
-## Published example and presentation evidence
+## Published example and historical presentation evidence
 
 `python Tools/validate_example.py --engine "C:/Program Files/Epic Games/UE_5.8"`
 prepares a new standalone source project, builds its Editor target and runs a
 silent disposable PIE test. Current room publication evidence:
-`SpatialFabricRoomPublication-7wo9j1_w`, **13 checks passed**. Its original C++ walking
+`SpatialFabricRoomPublication-7wo9j1_w`, **13 checks passed**. Release 2.1.0 was
+independently prepared/built again as `SpatialFabricExampleValidation-y7g7iehc`;
+all **13 silent PIE checks passed** with the merged plugin-discovery fix. Its original C++ walking
 character landed in the hallway, passed all four doorways, and was blocked by a
 hall wall, room divider and hall end cap. Animation and three Force Inline decodes
 succeeded without playing audio. The focused layout update also passed 21 static
@@ -114,14 +116,16 @@ server was needed. Networking is disabled only in the disposable copy to avoid
 another working editor's input ports. Run Unreal build jobs sequentially: installed
 engine UBT instances share a global mutex.
 
-The 16-slide presentation was opened/rendered in Microsoft PowerPoint; its PDF and
-contact sheet come from that export. Speaker notes are embedded. Source timings
+The historical 16-slide presentation was opened/rendered in Microsoft PowerPoint;
+its PDF and contact sheet came from that export. It is no longer in the current
+working/source release; downloads remain in GitHub release `v2.0.3`. Speaker notes are embedded. Source timings
 sum to 900 seconds of talk plus 600 seconds of demo, excluding open Q&A/reference
 slides. This validates document structure/rendering, not a venue's display/audio setup.
 
 Native artifacts/reports stay outside the repository. The example Content/SourceAssets
-snapshot is intentionally versioned under `Examples/SpatialFabricShowcase`; the
-editable presentation/PDF are intentionally versioned under `Presentations`.
+snapshot is intentionally versioned under `Examples/SpatialFabricShowcase`.
+Current release archives exclude retired presentation files and generated Unreal
+artifacts; the separate portable controller includes its own runtime notices.
 
 ## Required manual/integration gates before a show release
 

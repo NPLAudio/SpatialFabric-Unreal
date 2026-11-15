@@ -1,137 +1,117 @@
-# Create a release zip of the SpatialFabric plugin for NPLAudio/SpatialFabric
-# Trigger: push a version tag (v*) or run manually from Actions tab
-#
-# Usage:
-#   git tag v1.0.0
-#   git push origin v1.0.0
-#
-# Or: Actions -> Release Plugin -> Run workflow
-
-name: Release Plugin
+name: Release Artifacts
 
 on:
   push:
-    tags:
-      - 'v*'
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       version:
-        description: 'Release version (e.g. 1.0.0)'
+        description: 'Version matching SpatialFabric.uplugin; push its tag before publishing'
         required: true
-        default: '2.0.3'
+        default: '2.1.0'
 
 permissions:
   contents: write
 
 jobs:
-  release:
+  source:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      controller: ${{ steps.version.outputs.controller }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Validate combined plugin layout
-        run: python3 -m unittest discover -s Tools -p 'test_*.py'
-
-      - name: Determine version
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate repository and query examples
+        run: |
+          python -m unittest discover -s Tools -p 'test_*.py'
+      - name: Controller and Node checks
+        run: |
+          (cd Apps/OSCController && python -m unittest discover -s tests -v)
+          node --test Examples/OSCSceneQuery/test_scene_query.js
+      - name: Validate version
         id: version
         env:
-          INPUT_VERSION: ${{ github.event.inputs.version }}
-          TAG_REF: ${{ github.ref }}
+          REQUEST_VERSION: ${{ inputs.version }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            VERSION="$INPUT_VERSION"
-          else
-            VERSION="${TAG_REF#refs/tags/}"
-            VERSION="${VERSION#v}"
-          fi
-          # Sanitize: allow only semver chars (digits and dots)
-          SAFE_VERSION=$(echo "$VERSION" | tr -cd '0-9.')
-          [ -z "$SAFE_VERSION" ] && SAFE_VERSION="0.0.0"
-          echo "tag=v${SAFE_VERSION}" >> $GITHUB_OUTPUT
-          echo "name=${SAFE_VERSION}" >> $GITHUB_OUTPUT
-
-      - name: Create plugin zip
-        env:
-          RELEASE_NAME: ${{ steps.version.outputs.name }}
-        run: |
-          PLUGIN_DIR=SpatialFabric
-          mkdir -p dist/${PLUGIN_DIR}
-          rsync -a \
-            --exclude='.git' \
-            --exclude='.github' \
-            --exclude='dist' \
-            --exclude='__pycache__' \
-            --exclude='*.pyc' \
-            --exclude='.gitignore' \
-            --exclude='.claude' \
-            --exclude='docs' \
-            --exclude='Binaries' \
-            --exclude='Intermediate' \
-            --exclude='Saved' \
-            --exclude='DerivedDataCache' \
-            --exclude='Examples' \
-            --exclude='Presentations' \
-            --exclude='Apps' \
-            --exclude='.pi' \
-            --exclude='*.pdb' \
-            --exclude='.DS_Store' \
-            . dist/${PLUGIN_DIR}/
-          cd dist
-          zip -r "SpatialFabric-${RELEASE_NAME}.zip" ${PLUGIN_DIR}
-          cd ..
-          echo "ZIP_PATH=dist/SpatialFabric-${RELEASE_NAME}.zip" >> $GITHUB_ENV
-          echo "ZIP_NAME=SpatialFabric-${RELEASE_NAME}.zip" >> $GITHUB_ENV
-
-      - name: Create standalone source example zip
-        env:
-          RELEASE_NAME: ${{ steps.version.outputs.name }}
-        run: |
-          python3 Tools/prepare_example.py --destination "$RUNNER_TEMP/SpatialFabricShowcase"
-          cd "$RUNNER_TEMP"
-          zip -qr "$GITHUB_WORKSPACE/dist/SpatialFabric-Example-${RELEASE_NAME}.zip" SpatialFabricShowcase
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
+          python - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          version=json.loads(Path('SpatialFabric.uplugin').read_text())['VersionName']
+          requested=os.environ.get('REQUEST_VERSION') if os.environ['GITHUB_EVENT_NAME']=='workflow_dispatch' else os.environ['GITHUB_REF_NAME'].removeprefix('v')
+          assert re.fullmatch(r'\d+\.\d+\.\d+',version) and requested==version, 'Tag/input must match descriptor'
+          controller=re.search(r"__version__ = '([^']+)'",Path('Apps/OSCController/osc_controller/__init__.py').read_text()).group(1)
+          with open(os.environ['GITHUB_OUTPUT'],'a') as f: f.write(f'version={version}\ncontroller={controller}\n')
+          PY
+      - name: Package source distributions
+        run: python Tools/package_release.py --version '${{ steps.version.outputs.version }}' --output dist/release
+      - uses: actions/upload-artifact@v4
         with:
-          files: |
-            ${{ env.ZIP_PATH }}
-            dist/SpatialFabric-Example-${{ steps.version.outputs.name }}.zip
-            Presentations/SpatialFabric_From_Cue_to_Space.pptx
-            Presentations/SpatialFabric_From_Cue_to_Space.pdf
-          name: Release ${{ steps.version.outputs.name }}
-          body: |
-            ## SpatialFabric ${{ steps.version.outputs.name }}
+          name: release-source
+          path: dist/release/*
+          if-no-files-found: error
 
-            Source-only release: compile against your Unreal Engine installation.
-            Run Native Unreal validation on a provisioned host before production deployment.
-            Spatial audio control and direct device/channel playback for Unreal Engine.
-            Includes AudioLoom playback and CSV routing in the SpatialFabric Playback tab.
+  windows-controller:
+    needs: source
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: x64
+      - name: Build portable Windows controller
+        working-directory: Apps/OSCController
+        run: |
+          python -m pip install -r requirements-build.txt
+          python build_windows.py
+      - name: GUI and packaged no-network checks
+        working-directory: Apps/OSCController
+        shell: pwsh
+        run: |
+          $env:OSC_CONTROLLER_GUI_TESTS = '1'
+          python -m unittest discover -s tests -v
+          if ($LASTEXITCODE -ne 0) { throw 'Controller GUI tests failed' }
+          $report = Join-Path $env:RUNNER_TEMP 'controller-release-smoke.json'
+          Start-Process -FilePath '.\dist\SpatialFabricOSCController.exe' -ArgumentList @('--smoke-test', $report) -Wait
+          if (-not (Test-Path $report)) { throw 'Packaged startup produced no report' }
+          if ((Get-Content $report -Raw | ConvertFrom-Json).status -ne 'passed') { throw 'Packaged startup failed' }
+          Copy-Item 'dist/SpatialFabricOSCController-Windows-x64.zip' 'dist/SpatialFabricOSCController-${{ needs.source.outputs.controller }}-Windows-x64.zip'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-controller
+          path: Apps/OSCController/dist/SpatialFabricOSCController-${{ needs.source.outputs.controller }}-Windows-x64.zip
+          if-no-files-found: error
 
-            ### Installation
-
-            1. Download the zip file
-            2. Extract and copy the `SpatialFabric` folder into your project's `Plugins` directory
-            3. When upgrading AudioLoom, remove the standalone AudioLoom plugin and its .uproject entry first
-            4. Regenerate project files/rebuild as needed, then restart Unreal Editor
-
-            ### Requirements
-
-            - UE 5.8 Win64 is the validated native combination; other combinations need their own validation
-            - OSC plugin (bundled with UE)
-            - Matching C++ toolchain; both ZIPs are source distributions
-
-            ### Example and presentation
-
-            The Example ZIP contains the playable showcase source project and its project-local plugin.
-            Build/open its SpatialFabricShowcase.uproject; audio is manual-start and quiet.
-            The editable PowerPoint and PDF cover a 15-minute sound-designer talk, a separate
-            10-minute demo and Q&A. The full repository includes speaker notes and a demo run sheet.
-            Physical audio/latency and actual cooked-codec certification remain separate release gates.
-          tag_name: ${{ steps.version.outputs.tag }}
-          draft: false
-          generate_release_notes: true
+  publish:
+    needs: [source, windows-controller]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: dist/release
+          merge-multiple: true
+      - name: Finalize checksums
+        run: python Tools/package_release.py --finalize-directory dist/release
+      - name: Publish only if this release does not already exist
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: v${{ needs.source.outputs.version }}
+        run: |
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Release already exists (possibly locally validated/published). Do not overwrite its artifacts or checksums.'
+          else
+            gh release create "$RELEASE_TAG" dist/release/* --repo "$GITHUB_REPOSITORY" --verify-tag --title "SpatialFabric ${RELEASE_TAG#v}" --notes-file dist/release/RELEASE_NOTES.md
+          fi

@@ -108,38 +108,43 @@ are required. The checked-in manifest supplies file hashes/provenance for review
 
 ## Distribution boundaries
 
-GitHub contains the source plugin, published example and editable presentation.
-The plugin-only release ZIP excludes Examples and Presentations so installing it
-in an existing project does not import an entire sample project/deck. The example
-release ZIP is prepared as a standalone source project with its project-local plugin.
-It still requires a matching engine/toolchain; no portable precompiled DLL is implied.
+GitHub contains the source plugin, published example, controller and query clients.
+The plugin-only release ZIP excludes Examples/Apps so installation does not import
+sample projects or unrelated desktop tools. The example release ZIP contains its
+project-local source plugin; it still requires a matching engine/toolchain. The
+Windows controller ZIP bundles Python/Tk and needs no Unreal installation.
+
+After tests and committing a clean worktree, build release archives locally:
+
+```sh
+python Tools/package_release.py --version 2.1.0 --output dist/releases/2.1.0 --controller-zip Apps/OSCController/dist/1.2.0/SpatialFabricOSCController-Windows-x64.zip
+```
+
+The packager validates descriptor/version, excludes generated/private directories,
+prepares the self-contained example and emits a commit manifest/checksums. Build
+and smoke-test the controller first; do not package an arbitrary old executable.
+Tagging `v2.1.0` runs source/Node/controller checks and release builds in CI. If a
+release already exists, CI preserves its validated assets rather than overwriting
+them with independently rebuilt binaries/checksums.
 
 Do not version Binaries, Intermediate, Saved, DerivedDataCache, IDE state, device
 credentials, local `.pi`/MCP data or raw validation logs with local identifiers.
 Native artifacts stay in printed external evidence directories. The concise current
 validation summary can be published without bundling generated caches/logs.
 
-## Documentation and deck maintenance
+## Documentation maintenance
 
 Current operator guides live in Docs; AUDIT.md remains historical. Keep wire types,
 config file names, channel semantics, enable defaults and certification claims tied
 to production code. Particularly avoid obsolete “negate Y only”, “channel 0 duplicates
 mono”, “all adapters disabled”, and “one socket reconnect allocated each frame” claims.
 
-The deck source includes per-slide durations/notes. Rebuild with:
-
-```sh
-python -m pip install -r Presentations/requirements.txt
-python Tools/build_presentation.py
-```
-
-The optional Windows `Tools/export_presentation.ps1` exports PDF/PNG previews using
-installed PowerPoint; it closes only the generated presentation, not other open decks.
-Regenerate/reinspect the PDF if slide content changes.
-
-Inspect title/body fit, editability and speaker notes in PowerPoint/compatible
-software before presenting. The timed talk totals 15 minutes; the demonstration
-is a separate 10 minutes; Q&A is open-ended (allow 5–10 minutes in an event agenda).
+The removed presentation is not required by current release tests or packaging.
+Historical deck files are retained in Git tag/release `v2.0.3`. Legacy
+`Tools/build_presentation.py` and `Tools/export_presentation.ps1` require those
+archived inputs if deliberately restoring that presentation separately; they are
+not part of the current release build. Do not restore deleted user files merely
+to satisfy an obsolete presentation check.
 
 ## Extending the runtime
 

@@ -11,7 +11,7 @@ import shutil
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE = ROOT / "Examples/SpatialFabricShowcase"
 PLUGIN_FOLDERS = ("Source", "Config", "Resources", "ThirdParty", "assets", "Tools", "Docs")
-PLUGIN_FILES = ("SpatialFabric.uplugin", "README.md", "LICENSE", "FIXES.md", "VALIDATION.md")
+PLUGIN_FILES = ("SpatialFabric.uplugin", "README.md", "LICENSE", "FIXES.md", "VALIDATION.md", "RELEASE_NOTES.md")
 IGNORE = shutil.ignore_patterns(".git", ".pi", ".claude", "Binaries", "Intermediate", "Saved", "DerivedDataCache", ".vs", "__pycache__", "*.pyc")
 
 

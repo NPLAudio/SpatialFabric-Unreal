@@ -1,4 +1,4 @@
-"""Engine-free checks for the published project, portable copy, docs and presentation."""
+"""Engine-free checks for the published project, portable copy, docs and release contract."""
 import hashlib
 import json
 from pathlib import Path
@@ -6,8 +6,6 @@ import re
 import tempfile
 import unittest
 from urllib.parse import unquote
-import xml.etree.ElementTree as ET
-from zipfile import ZipFile
 from prepare_example import ROOT, EXAMPLE, prepare
 
 
@@ -36,6 +34,7 @@ class ExampleDistributionTests(unittest.TestCase):
         self.assertFalse(plugins['ModelContextProtocol'])
         self.assertFalse(plugins['AllToolsets'])
         self.assertEqual(descriptor['Modules'][0]['Name'], 'SpatialFabricShowcase')
+        self.assertEqual((EXAMPLE / descriptor['AdditionalPluginDirectories'][0]).resolve(), ROOT.parent)
         config = (EXAMPLE / 'Config/DefaultEngine.ini').read_text()
         self.assertIn('/Script/SpatialFabricShowcase.SpatialFabricShowcaseGameMode', config)
         self.assertNotIn('SecurityToken', config)
@@ -67,20 +66,16 @@ class ExampleDistributionTests(unittest.TestCase):
                 if not target: continue
                 self.assertTrue((path.parent / target).exists(), f'{path.relative_to(ROOT)} -> {target}')
 
-    def test_deck_timing_notes_and_delivered_documents(self):
-        folder = ROOT / 'Presentations'
-        spec = json.loads((folder / 'slides.json').read_text(encoding='utf-8'))
-        self.assertEqual(sum(s['seconds'] for s in spec['slides'] if s['section'] == 'talk'), 900)
-        self.assertEqual(sum(s['seconds'] for s in spec['slides'] if s['section'] == 'demo'), 600)
-        self.assertEqual(len(spec['slides']), 16)
-        with ZipFile(folder / 'SpatialFabric_From_Cue_to_Space.pptx') as archive:
-            slides = [n for n in archive.namelist() if re.fullmatch(r'ppt/slides/slide\d+\.xml', n)]
-            notes = [n for n in archive.namelist() if re.fullmatch(r'ppt/notesSlides/notesSlide\d+\.xml', n)]
-            self.assertEqual(len(slides), 16); self.assertEqual(len(notes), 16)
-            for name in notes: ET.fromstring(archive.read(name))
-        self.assertTrue((folder / 'SpatialFabric_From_Cue_to_Space.pdf').read_bytes().startswith(b'%PDF'))
-        self.assertTrue((folder / 'DEMO_RUNSHEET.md').is_file())
-        self.assertTrue((folder / 'PRESENTER_GUIDE.md').is_file())
+    def test_release_notes_and_retired_presentation_contract(self):
+        version = json.loads((ROOT / 'SpatialFabric.uplugin').read_text())['VersionName']
+        notes = (ROOT / 'RELEASE_NOTES.md').read_text(encoding='utf-8')
+        self.assertIn('SpatialFabric ' + version, notes)
+        self.assertIn('SHA256SUMS.txt', notes)
+        self.assertIn('CompleteSource.zip', notes)
+        self.assertIn('releases/tag/v2.0.3', notes)
+        self.assertFalse((ROOT / 'Presentations').exists())
+        self.assertNotIn('(Presentations/', (ROOT / 'README.md').read_text(encoding='utf-8'))
+        self.assertTrue((ROOT / 'Tools/package_release.py').is_file())
 
 
 if __name__ == '__main__': unittest.main()

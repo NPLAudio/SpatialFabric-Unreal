@@ -25,7 +25,8 @@ pagination and parsing, plus Python, Node.js, Max and Node-RED examples.
 ## Ready-made material
 
 - [Playable UE 5.8 source project](../Examples/SpatialFabricShowcase/README.md)
-- [Editable PowerPoint, presenter guide and 10-minute demo](../Presentations/README.md)
+- [Current release contents and installation](../RELEASE_NOTES.md)
+- [Historical presentation downloads (2.0.3)](https://github.com/NPLAudio/SpatialFabric/releases/tag/v2.0.3)
 - [Current validation evidence and outstanding release gates](../VALIDATION.md)
 - [Remediation/change summary](../FIXES.md)
 - [Task tracking](../TODO.md)

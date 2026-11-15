@@ -7,8 +7,9 @@ now versioned under `Examples/SpatialFabricShowcase`; prepare a portable copy wi
 `Tools/prepare_example.py`. The local sandbox remains independent and is not copied
 wholesale. Reproducible generators/inspection tools are in `Tools/Unreal/`.
 
-For a presentation, use the [timed 10-minute run sheet](../Presentations/DEMO_RUNSHEET.md).
-For ordinary setup, start with [Getting started](GettingStarted.md).
+For setup, start with [Getting started](GettingStarted.md). Older talk/deck materials
+remain in the [2.0.3 archive](https://github.com/NPLAudio/SpatialFabric/releases/tag/v2.0.3);
+this room tour supersedes their open-gallery walkthrough.
 
 ## Tour
 

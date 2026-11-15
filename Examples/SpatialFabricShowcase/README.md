@@ -120,7 +120,7 @@ Further guides in the full repository:
 - [Audio patching / CSV / migration](https://github.com/NPLAudio/SpatialFabric/blob/main/Docs/AudioPlayback.md)
 - [OSC reference](https://github.com/NPLAudio/SpatialFabric/blob/main/Docs/OSCReference.md)
 - [Troubleshooting](https://github.com/NPLAudio/SpatialFabric/blob/main/Docs/Troubleshooting.md)
-- [15-minute talk + 10-minute demo deck](https://github.com/NPLAudio/SpatialFabric/tree/main/Presentations)
+- [Historical talk/demo deck (2.0.3 archive)](https://github.com/NPLAudio/SpatialFabric/releases/tag/v2.0.3)
 
 In a prepared copy, the same operator guides are also under
 `Plugins/SpatialFabric/Docs`. Core code/tools are MIT; Unreal content references
