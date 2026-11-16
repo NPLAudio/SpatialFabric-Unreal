@@ -47,7 +47,10 @@ Unreal build results do not certify the Unity port or vice versa.
 
 ## Requirements and honest support status
 
-- **Validated engine/platform: UE 5.8 on Win64.** Build against your installed engine.
+- **Automated build/test evidence: UE 5.8 on Win64.** Build against your installed engine.
+- **macOS Apple Silicon: user-tested and reported working.** Exact Unreal/macOS
+  versions and audio-interface/test coverage were not recorded. This report does not
+  cover Intel Macs; see [validation details](VALIDATION.md#macos-apple-silicon-user-reported-validation).
 - Windows native builds require Visual Studio 2022 C++ tools, a compatible Windows
   SDK and .NET Framework SDK; see [build instructions](Docs/Development.md).
 - Runtime dependency: Unreal's built-in **OSC** plugin. This repository contains
@@ -56,8 +59,9 @@ Unreal build results do not certify the Unity port or vice versa.
   require Epic's FirstPerson character/animation content or any sample download.
 - Optional editor regeneration tools require Python Editor Script Plugin,
   Editor Scripting Utilities and Sequencer Scripting; the example enables them.
-- WASAPI is implemented for Windows; Core Audio is implemented for macOS, but Mac
-  compilation/device behavior is **not certified by the Windows results**.
+- WASAPI is implemented for Windows; Core Audio is implemented for macOS.
+  The Apple Silicon user report is separate from Windows automated results and
+  does not certify every Core Audio device, format or lifecycle scenario.
   No Linux direct-device playback certification is claimed.
 
 Native Editor/Development/Shipping compilation does **not** certify physical audio

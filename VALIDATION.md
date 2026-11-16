@@ -9,6 +9,17 @@ python -m unittest discover -s Tools -p "test_*.py"
 Checks descriptor/module integration, migration/distribution files, and the native
 report parser (including failed-test reports accompanied by process exit code zero).
 
+## macOS Apple Silicon: user-reported validation
+
+The user confirms that the **Unreal SpatialFabric plugin has been tested and works
+on macOS Apple Silicon**. This is an operator-reported functional result, not an
+inference from Unity's separate native backend or from Windows builds.
+
+Exact Unreal/macOS versions, Mac model, audio interface and detailed OSC/playback
+checks were not supplied. No automated Unreal Mac build/test report is attached;
+Intel Macs and the full Core Audio format/device/lifecycle matrix remain unverified.
+The detailed hardware/show-release checks below still apply to each target setup.
+
 ## Native Windows validation
 
 Install UE 5.8 and its supported Visual Studio C++ toolchain, Windows SDK, and .NET
@@ -137,9 +148,11 @@ certification. Record these against each supported engine, OS, and audio interfa
 2. Windows: float32/PCM16/PCM24/PCM32 mix formats, exclusive success/fallback, short
    one-shots, tail drain, Stop responsiveness, unplug/stall/error reporting, and no
    fallback to a different endpoint. Compare requested versus actual latency.
-3. macOS: native compilation plus interleaved/non-interleaved stream layouts, matched
-   virtual stream rates, unsupported-format rejection, device disconnect, and callback
-   silence/stop timing. Core Audio code cannot be validated on a Windows build host.
+3. macOS: Apple Silicon is user-tested and reported working (see above). For detailed
+   show acceptance, record native build configuration, interleaved/non-interleaved
+   stream layouts, matched virtual stream rates, unsupported-format rejection, device
+   disconnect, and callback silence/stop timing on the actual Mac/interface. The user
+   report does not establish this complete matrix or Intel Mac compatibility.
 4. Package an actual project with referenced **Force Inline** SoundWaves for the chosen
    codecs; verify decoder availability and sample duration/channel order in Development
    and Shipping. Verify streaming assets are rejected with the documented message.

@@ -4,8 +4,12 @@
 
 ## Before opening a project
 
-SpatialFabric is a **source plugin**. Use UE 5.8 and a supported C++ toolchain;
-Win64 is the validated combination. Close Unreal and back up an existing project
+SpatialFabric is a **source plugin**. UE 5.8 on Win64 has automated build/test evidence.
+**macOS Apple Silicon is also user-tested and reported working**; exact engine/OS
+versions were not supplied, and Intel Macs are not covered by that report. Build
+against your installed engine with its supported C++ toolchain; see
+[validation details](../VALIDATION.md#macos-apple-silicon-user-reported-validation).
+Close Unreal and back up an existing project
 before replacing plugin modules. Never install standalone AudioLoom alongside the
 combined plugin: both define `/Script/AudioLoom` classes.
 

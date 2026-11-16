@@ -4,9 +4,11 @@
 
 ## Supported evidence, not inferred support
 
-The current native evidence targets **UE 5.8 Win64** with Visual Studio 2022,
-Windows SDK and .NET Framework 4.8 SDK. Other engine/OS/interface combinations need
-their own builds and integration tests. A successful plugin build is separate from
+The automated native evidence targets **UE 5.8 Win64** with Visual Studio 2022,
+Windows SDK and .NET Framework 4.8 SDK. **macOS Apple Silicon is user-tested and
+reported working**; exact engine/OS versions and detailed test logs were not supplied.
+See [the user-reported validation record](../VALIDATION.md#macos-apple-silicon-user-reported-validation).
+Intel Macs and other engine/OS/interface combinations need their own builds and integration tests. A successful plugin build is separate from
 cooking actual show media and separate again from physical audio verification.
 
 ## Build in a host project

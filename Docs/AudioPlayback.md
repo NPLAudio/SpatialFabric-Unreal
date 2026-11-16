@@ -15,8 +15,11 @@ macOS. It does not automatically traverse Unreal AudioComponent attenuation,
 SoundClass/submix processing or the external ADM renderer. A spatial Manager,
 Stage Volume, or OSC server is not required to play a cue locally.
 
-Mac code requires its own native/device validation; Windows results are not Mac
-certification. Linux direct-device playback is not certified.
+The Unreal plugin is **user-tested and reported working on macOS Apple Silicon**.
+No detailed Core Audio device/format test matrix was supplied; the report is not
+blanket hardware certification or Intel Mac validation. See the
+[validation record](../VALIDATION.md#macos-apple-silicon-user-reported-validation).
+Linux direct-device playback is not certified.
 
 ## Patch channels deliberately
 
@@ -75,7 +78,8 @@ PCM is interpolated at the actual output-device rate to preserve duration/pitch
 across source/device-rate differences. Windows writes negotiated float32 or
 integer16/24/32, including valid-bit packing, and rejects unsupported formats.
 Mac code checks float32 virtual layouts/consistent rates and pre-zeroes callback
-buffers; native Mac compilation/device/layout testing is still a release gate.
+buffers. Apple Silicon has a user-reported working result; detailed device/layout
+acceptance and Intel Mac testing remain separate gates.
 
 ## Packaged/cooked SoundWaves
 
