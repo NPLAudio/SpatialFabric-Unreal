@@ -18,6 +18,18 @@ Stage, Objects, Radar, Output and Playback.
 [Playable example](Examples/SpatialFabricShowcase/README.md) ·
 [Validation and limits](VALIDATION.md)
 
+## SpatialFabric repositories
+
+| Repository | Purpose |
+|---|---|
+| [SpatialFabric](https://github.com/NPLAudio/SpatialFabric) | Unreal plugin, four-room example and standalone OSC Controller |
+| [SpatialFabric-Unity](https://github.com/NPLAudio/SpatialFabric-Unity) | Unity UPM port, native audio backend and four-room walking showcase |
+| [SpatialFabric-Interop](https://github.com/NPLAudio/SpatialFabric-Interop) | Shared OSC contracts, JSON schemas and golden wire fixtures |
+| [AudioLoom](https://github.com/NPLAudio/AudioLoom) | Legacy standalone Unreal playback repository; access-controlled/private, now integrated here |
+
+Unity validation and platform/hardware limits are documented in its own repository;
+Unreal build results do not certify the Unity port or vice versa.
+
 ## Choose your starting point
 
 | You want to… | Start here |
