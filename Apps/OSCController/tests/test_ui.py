@@ -200,4 +200,26 @@ class GuiTests(unittest.TestCase):
         self.assertIn('LIVE', self.app.cues.set(str(live_index), 'state'))
 
 
+    def test_debugger_tab_binds_nothing_until_started_and_shows_verdicts(self):
+        from osc_controller.protocol import Message, encode
+        panel = self.app.debugger_panel
+        self.assertFalse(panel.debugger.listening)
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            probe.bind(('127.0.0.1', 0)); port = probe.getsockname()[1]
+        panel.listen_port.set(str(port)); panel.monitor_port.set(''); panel.engine_port.set(str(self.capture.getsockname()[1])); panel.reply_port.set('0')
+        panel.reply_port.set(str(port + 1 if port < 65000 else port - 1))
+        panel.start(); self.assertTrue(panel.debugger.listening)
+        self.assertIsNone(panel.debugger.forward_to)                         # forwarding is opt-in
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sender:
+            sender.sendto(encode(Message('/demo/playback/mono/play', (('s', 'go'),))), ('127.0.0.1', port))
+            sender.sendto(b'garbage', ('127.0.0.1', port))
+        until = time.monotonic() + 2
+        while len(panel.rows) < 2 and time.monotonic() < until:
+            self.app.update(); time.sleep(.01)
+        verdicts = [f.code for r in panel.rows for f in r.findings]
+        self.assertIn('nonnumeric', verdicts); self.assertIn('malformed', verdicts)
+        self.assertEqual(len(self.app.debugger_panel.tree.get_children()), len(panel.rows))
+        panel.stop(); self.assertFalse(panel.debugger.listening)
+
+
 if __name__ == '__main__': unittest.main()

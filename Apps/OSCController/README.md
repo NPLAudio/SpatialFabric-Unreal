@@ -99,6 +99,58 @@ unknown kinds are rejected):
 
 **A microphone near the speakers it feeds will howl:** use headphones or a low gain. Start only deliberately.
 
+## Debugger / test bed for sender apps
+
+The **Debugger / test bed** tab (and `python -m osc_controller.debugger`) answers: *what is my app really
+sending, does it conform, and what does the running engine do with it?* Point your sender (Max, TouchOSC,
+a show-control app, your own code) at the debugger's listen port instead of the engine.
+
+1. **Start debugger.** It binds only the listen port (default `9400`), the optional engine-state port, and a
+   read-only query reply socket. Nothing binds or sends until you press Start.
+2. **Load engine contract.** A read-only scene query pulls the engine's real cue bases, kinds
+   (playback / live input) and bound object IDs. Without it only wire rules are checked and cue bases show as
+   *unverified* (payload rules still apply).
+3. Every datagram is decoded and judged: malformed packets (with their raw bytes and the decode reason),
+   unsupported type tags (booleans are not a Play/Loop command), addresses that do not exist in the running
+   engine (with a "did you mean" suggestion), commands that do not apply to the cue kind (loop on a live input),
+   AudioLoom trigger rules (first float anywhere beats the first int; play float >= 0.5 / int >= 1; loop float
+   strictly > 0.5, address-only loop disables; non-numeric payloads never act), live gain 0..4, ADM xyz/aed/gain/
+   width/mute/name types and ranges, unit-sphere limiting, object IDs the engine does not bind, scene-query shape,
+   sending engine-only messages (`/state`, scene responses), type changes per address, and send-rate bursts.
+   Each row says what the engine **will do** or what is wrong.
+4. **Forward + verify (off by default).** Valid messages (never ones with errors) are forwarded to the engine
+   input, then the debugger compares the sender's intent with the engine's *own* report: `/state`, and a fresh
+   scene query for `playing`, `loop`, live `gain`. Results: *engine reports it is running*, or *never reported
+   running* together with the engine's own `last_error` / backend fields, loop and gain mismatches, a stop that
+   did not stop. **A forwarded `/play` can start real playback and a live-input `/play` can open a microphone on
+   the engine machine** (a confirmation is required).
+
+`Export report...` (or `--report`) writes JSON: contract, totals, per-address statistics, effects and records.
+
+Command line (automation; exits non-zero when findings reach `--fail-on`, default `error`):
+
+```sh
+python -m osc_controller.debugger --listen 127.0.0.1:9400 --engine-query 127.0.0.1:9000 --monitor 127.0.0.1:9101 --duration 30 --report out.json
+python -m osc_controller.debugger --listen 127.0.0.1:9400 --engine-query 127.0.0.1:9000 --monitor 127.0.0.1:9101 --forward 127.0.0.1:9000
+```
+
+**Engine simulator** for testing a sender with no engine at all:
+
+```sh
+python -m osc_controller.simulator --listen 127.0.0.1:9000 --monitor 127.0.0.1:9101 --cue /demo/playback/mono --live /audioloom/Stage/live/1 --fail-start /demo/playback/glass --cue /demo/playback/glass
+```
+
+It implements cue `/play /stop /loop /gain`, observed `/state` and read-only scene discovery, and keeps simulated
+state. It **never produces sound, opens a device or touches a microphone**. `--fail-start BASE` makes a cue refuse to
+start (like an invalid device) so a sender's error handling can be exercised. Its transport rules are written
+independently of the debugger's, and a test requires both to agree on every payload.
+
+Limits, stated plainly: ADM/Custom messages are checked against the contract only; their effect on an engine is not
+verified. Effect checks need the engine's discovery rows (`loop`, `gain`, `playing`, `last_error`), UDP is not
+acknowledged, and `/state` is sent only when the worker state changes. Live comparison has been exercised against the
+**Godot** engine only (headless, silent, via `SpatialFabric-Godot/Tests/Godot/serve_for_debugger.gd`); Unity and Unreal
+were not run live for this feature. The checked-in Windows executable was not rebuilt.
+
 ## Spatial / renderer
 
 The pad is **direct ADM renderer control**. It does **not** move Unreal actors,

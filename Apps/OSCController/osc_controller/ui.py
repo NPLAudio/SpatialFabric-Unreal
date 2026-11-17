@@ -9,6 +9,7 @@ import sys
 import time
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, simpledialog
+from .debugger_view import DebuggerPanel
 from .model import Cue, Profile, endpoint, load_profile, save_profile
 from .protocol import Message, parse_arguments, spatial_messages
 from .transport import Sender
@@ -103,6 +104,7 @@ class Controller(tk.Tk):
         for frame, label in [(cue_tab, 'Cue transport'), (spatial_tab, 'Spatial / renderer'), (composer_tab, 'Message composer'), (monitor_tab, 'Monitor / log')]: notebook.add(frame, text=label)
         self.tracker = TrackerPanel(notebook, self.start_tracker, self.stop_tracker, self.query_scene, self.import_discovered_cues)
         notebook.insert(1, self.tracker, text='Object tracker')
+        self.debugger_panel = DebuggerPanel(notebook); notebook.add(self.debugger_panel, text='Debugger / test bed')
         self._cue_tab(cue_tab); self._spatial_tab(spatial_tab); self._composer_tab(composer_tab); self._monitor_tab(monitor_tab)
 
     def _cue_tab(self, frame):
@@ -546,6 +548,7 @@ class Controller(tk.Tk):
         # Exiting is not a remote stop: do not send hidden transport requests.
         self.live.set(False)
         self.after_cancel(self.pump_token)
+        self.debugger_panel.close()
         self.receivers.close(); self.sender.close(); self.destroy()
 
 
