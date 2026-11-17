@@ -2,6 +2,8 @@
 Run using Python 3.13 after installing requirements-build.txt in a virtual environment.
 """
 import argparse
+import hashlib
+import json
 from importlib.metadata import distribution
 from pathlib import Path
 import shutil
@@ -15,6 +17,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parent
 NAME = 'SpatialFabricOSCController'
+TOOLS = [('SpatialFabricDebugger', 'debugger_launch.py'), ('SpatialFabricEngineSimulator', 'simulator_launch.py')]  # console tools, no Tk
 
 
 def main():
@@ -46,8 +49,13 @@ def main():
                         '--add-data', str(ROOT / 'THIRD_PARTY_NOTICES.md') + ';.',
                         '--distpath', str(output_dir), '--workpath', str(work / 'work'), '--specpath', str(work),
                         str(ROOT / 'launch.py')], cwd=ROOT, check=True)
+        for tool, script in TOOLS:
+            subprocess.run([sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--onefile', '--console', '--name', tool, '--icon', str(ROOT / 'assets/controller.ico'),
+                            '--exclude-module', 'tkinter', '--add-data', str(ROOT / 'LICENSE') + ';.', '--distpath', str(output_dir), '--workpath', str(work / ('work-' + tool)),
+                            '--specpath', str(work), str(ROOT / script)], cwd=ROOT, check=True)
         portable = output_dir / NAME; portable.mkdir(parents=True, exist_ok=True)
         shutil.copy2(output_dir / (NAME + '.exe'), portable)
+        for tool, _ in TOOLS: shutil.copy2(output_dir / (tool + '.exe'), portable)
         for name in ('README.md', 'LICENSE', 'THIRD_PARTY_NOTICES.md'): shutil.copy2(ROOT / name, portable)
         shutil.copytree(ROOT / 'profiles', portable / 'profiles', dirs_exist_ok=True)
         shutil.copytree(notices, portable / 'runtime-licenses', dirs_exist_ok=True)
@@ -55,7 +63,13 @@ def main():
         with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as output:
             for path in sorted(portable.rglob('*')):
                 if path.is_file(): output.write(path, path.relative_to(portable.parent))
+        artifacts = [output_dir / (NAME + '.exe'), *(output_dir / (tool + '.exe') for tool, _ in TOOLS), archive]
+        sums = [{'name': a.name, 'bytes': a.stat().st_size, 'sha256': hashlib.sha256(a.read_bytes()).hexdigest()} for a in artifacts]
+        version = next(line for line in (ROOT / 'osc_controller/__init__.py').read_text().splitlines() if line.startswith('__version__')).split("'")[1]
+        (output_dir / 'SHA256SUMS.txt').write_text(''.join(f"{s['sha256']}  {s['name']}\n" for s in sums), encoding='utf-8')
+        (output_dir / 'BUILD_MANIFEST.json').write_text(json.dumps({'version': version, 'platform': 'Windows x64', 'signed': False, 'artifacts': sums}, indent=2) + '\n', encoding='utf-8')
         print('\nExecutable:', output_dir / (NAME + '.exe'))
+        for tool, _ in TOOLS: print('Console tool:', output_dir / (tool + '.exe'))
         print('Portable ZIP:', archive)
 
 

@@ -23,7 +23,7 @@ BG, PANEL, TEXT, MUTED, CYAN, PURPLE, ORANGE = '#0b1426', '#14243c', '#eef5ff', 
 class Controller(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title('SpatialFabric OSC Controller 1.2 — standalone')
+        self.title('SpatialFabric OSC Controller 1.3 — standalone')
         width, height = min(1240, self.winfo_screenwidth()-60), min(820, self.winfo_screenheight()-90)
         self.geometry(f'{width}x{height}'); self.minsize(980, 640); self.configure(bg=BG)
         self.sender, self.receivers = Sender(), ReceiverHub()
@@ -536,7 +536,7 @@ class Controller(tk.Tk):
         text = tk.Text(window, wrap='word', bg=PANEL, fg=TEXT, font=('Consolas', 10), padx=16, pady=16)
         scroll = ttk.Scrollbar(window, command=text.yview); text.configure(yscrollcommand=scroll.set)
         scroll.pack(side='right', fill='y'); text.pack(fill='both', expand=True)
-        text.insert('end', 'SpatialFabric OSC Controller 1.2.0\nIndependent OSC control; not an audio player.\n\nUDP is unauthenticated and unacknowledged. Use trusted networks.\nClosing the controller does not stop remote audio.\n\n')
+        text.insert('end', 'SpatialFabric OSC Controller 1.3.0\nIndependent OSC control; not an audio player.\n\nUDP is unauthenticated and unacknowledged. Use trusted networks.\nClosing the controller does not stop remote audio.\n\n')
         root = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[1]))
         paths = [root / 'LICENSE', root / 'THIRD_PARTY_NOTICES.md'] + sorted((root / 'runtime-licenses').glob('*'))
         for path in paths:

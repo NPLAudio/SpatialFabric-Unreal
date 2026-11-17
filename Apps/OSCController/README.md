@@ -1,4 +1,4 @@
-# SpatialFabric OSC Controller 1.2
+# SpatialFabric OSC Controller 1.3
 
 A **separate desktop application**, not an Unreal plugin or editor panel. It sends
 OSC/UDP to SpatialFabric or another OSC device, and monitors incoming messages.
@@ -10,9 +10,11 @@ account, or third-party OSC library is required.
 After building, double-click **`dist/SpatialFabricOSCController.exe`**. The companion
 `dist/SpatialFabricOSCController-Windows-x64.zip` is the portable distribution:
 extract it and run the executable inside. A version-separated local build may be
-under **`dist/1.2.0/SpatialFabricOSCController.exe`**; check About for version 1.2.
+under **`dist/1.3.0/SpatialFabricOSCController.exe`**; check About for version 1.3.
 Python and Tcl/Tk are bundled; recipients
 do not need to install Python. Keep the included license notices when sharing.
+
+The portable ZIP also contains two **console tools** (no Tk): `SpatialFabricDebugger.exe` (sender-app debugger, see below) and `SpatialFabricEngineSimulator.exe` (a stand-in engine that makes no sound). Run either with `--help`. A build also writes `SHA256SUMS.txt` and `BUILD_MANIFEST.json`.
 
 This is an unsigned local executable: Windows may show an unsigned-app warning.
 There is no installer, elevation requirement, telemetry, or automatic network
@@ -301,7 +303,7 @@ py -3.13 -m venv .venv
 .venv\Scripts\python -m pip install -r requirements-build.txt
 .venv\Scripts\python build_windows.py
 # Avoid overwriting an older executable that is still open:
-.venv\Scripts\python build_windows.py --output-dir dist/1.2.0
+.venv\Scripts\python build_windows.py --output-dir dist/1.3.0
 ```
 
 Builds run the protocol/profile/UDP tests, use PyInstaller, bundle Python/Tk and
