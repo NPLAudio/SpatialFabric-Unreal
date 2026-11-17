@@ -8,7 +8,7 @@ import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_FIXTURE = ROOT.parents[2] / "SpatialFabric-Interop/Fixtures/ack-v1.json"
+DEFAULT_FIXTURE = ROOT.parents[2] / "SpatialFabric/Fixtures/ack-v1.json"
 OUTPUT = ROOT / "Source/AudioLoom/Private/Tests/AudioLoomAckFixtures.inl"
 
 
