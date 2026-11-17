@@ -1,2 +1,0 @@
-# Build-only dependency. Running the source needs only Python and Tk.
-PyInstaller==6.22.3

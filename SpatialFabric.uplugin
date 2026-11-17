@@ -1,7 +1,7 @@
 {
 	"FileVersion": 3,
-	"Version": 9,
-	"VersionName": "2.1.0",
+	"Version": 10,
+	"VersionName": "2.2.0",
 	"FriendlyName": "SpatialFabric",
 	"IconPath": "Resources/Icon128.png",
 	"Description": "Spatial audio control and direct device/channel playback for Unreal Engine. Combines ADM-OSC and Custom OSC positioning with AudioLoom SoundWave playback, channel routing, OSC transport control, and CSV routing management.",

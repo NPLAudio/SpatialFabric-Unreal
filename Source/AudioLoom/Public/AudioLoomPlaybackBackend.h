@@ -19,6 +19,7 @@ struct FAudioLoomPlaybackEvent
 {
 	bool bPlaying = false;
 	bool bNaturalCompletion = false;
+	FString Error; // terminal failure captured with this event, never a later stream's error
 };
 
 /**
@@ -57,6 +58,7 @@ public:
 	float GetOutputLatencyMs() const;
 
 private:
+	bool bUnsupportedStartPending = false;
 #if PLATFORM_WINDOWS || PLATFORM_MAC
 	TUniquePtr<FAudioLoomPlaybackBackendImpl> Impl; // platform impl defined only on supported playback platforms
 #endif

@@ -14,11 +14,12 @@ UAudioLoomLiveInputComponent::UAudioLoomLiveInputComponent()
     bTickInEditor = true;
     Backend = new FAudioLoomLiveBackend();
 }
-void UAudioLoomLiveInputComponent::OnRegister() { Super::OnRegister(); RefreshOscRegistry(); }
-void UAudioLoomLiveInputComponent::OnUnregister() { StopLive(); Super::OnUnregister(); RefreshOscRegistry(); }
-void UAudioLoomLiveInputComponent::EndPlay(const EEndPlayReason::Type Reason) { StopLive(); Super::EndPlay(Reason); }
+void UAudioLoomLiveInputComponent::OnRegister() { bTearingDown = false; Super::OnRegister(); RefreshOscRegistry(); }
+void UAudioLoomLiveInputComponent::OnUnregister() { bTearingDown = true; StopLive(); Super::OnUnregister(); RefreshOscRegistry(); }
+void UAudioLoomLiveInputComponent::EndPlay(const EEndPlayReason::Type Reason) { bTearingDown = true; StopLive(); Super::EndPlay(Reason); }
 void UAudioLoomLiveInputComponent::BeginDestroy()
 {
+    bTearingDown = true;
     if (Backend) { Backend->Stop(); delete Backend; Backend = nullptr; }
     Super::BeginDestroy();
 }
@@ -31,8 +32,10 @@ bool UAudioLoomLiveInputComponent::ParseGainArguments(const TArray<float>& Float
 }
 bool UAudioLoomLiveInputComponent::StartLive()
 {
-    if (!Backend || !IsRegistered()) return false;
+    if (bTearingDown || !Backend || !IsRegistered()) return false;
     if (InputChannel < 0 || OutputChannel < 0 || !FMath::IsFinite(Gain) || Gain < 0.f || Gain > 4.f) return false;
+    StopLive(); // consume the previous worker's terminal event before accepting a new request
+    if (bTearingDown || !IsValid(this) || !IsRegistered() || !Backend) return false; // state delegates can unregister/destroy us
     bStartPending = true;
     Backend->Start(InputDeviceId, InputChannel, OutputDeviceId, OutputChannel, bUseExclusiveOutput, BufferSizeMs, Gain);
     SetComponentTickEnabled(true);
@@ -81,6 +84,13 @@ void UAudioLoomLiveInputComponent::PollBackend()
 void UAudioLoomLiveInputComponent::HandleEvent(const FAudioLoomPlaybackEvent& Event)
 {
     bStartPending = false; // the worker has now reported (live or failed)
+    if (!Event.Error.IsEmpty())
+        if (UWorld* World = GetWorld())
+            if (auto* Sub = World->GetSubsystem<UAudioLoomOscSubsystem>())
+            {
+                Sub->SendPlayFailure(GetOscAddress(), Event.Error, Event.bPlaying);
+                if (bLive == Event.bPlaying) Sub->SendLiveStateUpdate(this, Event.bPlaying);
+            }
     if (bLive == Event.bPlaying) return;
     bLive = Event.bPlaying;
     if (UWorld* World = GetWorld())

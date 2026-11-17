@@ -132,7 +132,7 @@ This is `bThrottleCPUWhenNotForeground=False` in EditorPerformanceSettings. It c
 more CPU/GPU/power but avoids focus-related editor/PIE slowdown. Keep viewport
 Realtime enabled or use PIE for animation; this is not an audio latency guarantee.
 
-The [standalone controller](../Apps/OSCController/README.md) now has simultaneous
+The [standalone controller](https://github.com/NPLAudio/SpatialFabric/tree/main/Apps/OSCController) now has simultaneous
 state/ADM/Custom receivers, same-PC diagnostics and a multi-view Object tracker.
 Unreal must still **Start OSC** on its Playback input (normally 9000). Starting an
 app monitor on 9001 does not start the Unreal input receiver.

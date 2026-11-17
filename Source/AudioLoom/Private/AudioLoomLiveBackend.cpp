@@ -46,13 +46,15 @@ public:
     }
     void Run()
     {
-        RunPlatform();
+        const bool bOk = RunPlatform();
         {
             FScopeLock Lock(&StatusLock);
             Status = FAudioLoomLiveStatus();
         }
         Running = false;
-        Events.Enqueue({false, false});
+        FScopeLock Lock(&ErrorLock);
+        if (!bOk && !StopRequested && Error.IsEmpty()) Error = TEXT("Live worker could not start or continue");
+        Events.Enqueue({false, false, Error});
     }
     void Publish(int32 InCh, int32 InRate, int32 OutCh, int32 OutRate)
     {
@@ -374,13 +376,14 @@ void FAudioLoomLiveBackend::Start(const FString& InputDeviceId, int32 InputChann
     Stop();
     { FScopeLock Lock(&Impl->ErrorLock); Impl->Error.Empty(); }
     if (InputChannel < 0 || InputChannel > 64 || OutputChannel < 0 || OutputChannel > 64 || BufferSizeMs < 0 || BufferSizeMs > 2000 || !FMath::IsFinite(Gain) || Gain < 0.f || Gain > 4.f)
-    { Impl->Fail(TEXT("Invalid live input channel, buffer or gain request")); Impl->Events.Enqueue({false, false}); return; }
+    { Impl->Fail(TEXT("Invalid live input channel, buffer or gain request")); Impl->Events.Enqueue({false, false, TEXT("Invalid live input channel, buffer or gain request")}); return; }
     Impl->InputId = InputDeviceId; Impl->InputChannel = InputChannel; Impl->OutputId = OutputDeviceId; Impl->OutputChannel = OutputChannel;
     Impl->Exclusive = bExclusive; Impl->BufferMs = BufferSizeMs; Impl->Gain = Gain;
     Impl->StopRequested = false;
     Impl->Thread = std::thread([this] { Impl->Run(); });
 #else
     (void)InputDeviceId; (void)InputChannel; (void)OutputDeviceId; (void)OutputChannel; (void)bExclusive; (void)BufferSizeMs; (void)Gain;
+    bUnsupportedStartPending = true;
 #endif
 }
 void FAudioLoomLiveBackend::Stop()
@@ -410,7 +413,7 @@ void FAudioLoomLiveBackend::DrainEvents(TArray<FAudioLoomPlaybackEvent>& Events)
     FAudioLoomPlaybackEvent Event;
     while (Impl->Events.Dequeue(Event)) Events.Add(Event);
 #else
-    (void)Events;
+    if (bUnsupportedStartPending) { Events.Add({false, false, GetLastError()}); bUnsupportedStartPending = false; }
 #endif
 }
 FAudioLoomLiveStatus FAudioLoomLiveBackend::GetStatus()

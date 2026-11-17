@@ -4,7 +4,7 @@
 
 ## Standalone controller
 
-The independent [OSC Controller desktop app](../Apps/OSCController/README.md) provides
+The independent [OSC Controller desktop app](https://github.com/NPLAudio/SpatialFabric/tree/main/Apps/OSCController) provides
 cue Play/Stop/Loop, worker-state monitoring, direct ADM renderer controls and a typed
 message composer, plus **live-input cues** (confirmed Start, Stop, bounded Gain; see the controller README), and a **Debugger / test bed** that checks what a sender app emits against the OSC contract and a running engine's real inventory, with an engine simulator. It runs without Unreal and never auto-sends on startup. Its spatial
 pad controls a renderer directly; it does not remotely move Unreal actors.
@@ -31,7 +31,7 @@ See the [complete v1 contract](SceneQuery.md) and
 
 127.0.0.1 means this computer. For another machine, use its reachable address.
 0.0.0.0 is an all-interface **listen binding**, not a receiver destination.
-OSC/UDP is unauthenticated and delivery is not acknowledged. Do not expose these
+OSC/UDP is unauthenticated; cue acknowledgements provide feedback, not reliable delivery. Do not expose these
 ports or an editor MCP endpoint to untrusted networks. Multiple editors can collide
 on the input ports; close the other owner rather than hiding the error with reuse.
 
@@ -117,7 +117,7 @@ A live-input component answers on its own base (default `/audioloom/<root>/live/
 |---|---|
 | `/play` | Address-only, float >=0.5 or int32 >=1 submits a **start request** (may prompt for microphone access) |
 | `/stop` | Stops the live bridge |
-| `/gain` | First float anywhere, else first int32; finite 0..4 only, anything else is ignored |
+| `/gain` | First float anywhere, else first int32; finite 0..4 only, anything else is rejected |
 | `/state` | Outgoing float 1/0: the worker really started / is not live. Not a command acknowledgement |
 
 See [Audio playback](AudioPlayback.md#live-input-microphone--line-in) for feedback and permission notes.
@@ -136,14 +136,59 @@ Resolve the component's effective base with **Get OSC Address**. The example use
 |---|---|
 | `/play` | Address-only, float >=0.5, or int32 >=1 starts/restarts playback |
 | `/stop` | Stops and cancels pending replay; arguments are not a confirmation protocol |
-| `/loop` | Use numeric 0/1 to change live loop state |
+| `/loop` | First float anywhere, else first int32; >0.5 enables, address-only disables; nonnumeric payload ignored |
 | `/state` | Outgoing float 1/0 from worker lifecycle, not a command acknowledgement |
 
 A string `"1"` is not numeric 1. False/zero play messages do not fire. Supported
 wire tags do not imply every tag has a transport interpretation: prefer the numeric
 forms above; do not rely on Boolean True as a Play/Loop command. `/state` can show
 natural completion or stop after a successful stream start. A request that fails
-before starting must not be treated as audible success; inspect playback error/logs.
+before starting must not be treated as audible success; watch `/ack` failure feedback and playback error/logs.
+
+### Command acknowledgement and status (both cue kinds)
+
+Every command suffix addressed to a known cue base answers on **SendIP:SendPort**
+(default `127.0.0.1:9001`), the same destination as `/state`, not the sender's source port:
+
+`<base>/ack ,ssis command result playing detail`
+
+- `command`: suffix, sanitized to ASCII letters/digits/underscore/hyphen, at most 32 characters.
+- `result`: `received` (acted on), `ignored` (payload says no effect or engine-only message),
+  `rejected` (invalid arguments/unsupported command), or `failed` (start/worker failure).
+- `playing`: int32 0/1, observed worker state, **not** a pending start request.
+- `detail`: short UTF-8 human-readable reason (up to 256 characters); may be empty.
+
+`play received` is a start request only. It is followed by observed `/state 1`, or
+`ack play failed 0 <reason>` for missing/undecodable sources, unavailable backends,
+or asynchronous device/worker refusal. Worker failures after starting also report
+`play failed` and `/state 0`; normal stops and natural endings report `/state 0`.
+Failures from local/Blueprint starts are also sent to the monitor while it is active.
+
+Address-only `<base>/status` answers `ack status received <playing> ""` then
+`<base>/state <playing>` (float 0/1), so late controllers can synchronize without
+starting audio. Status with arguments is rejected. `/ack` and `/state` sent **to**
+the engine are ignored with acknowledgement; unknown suffixes are rejected.
+`/loop` on live cues and `/gain` on playback cues are rejected. Invalid live gain
+never changes the previous value. A nonnumeric `/loop` never disables an existing loop.
+Float arguments take precedence over ints anywhere in the list. Stop ignores payload.
+Unknown bases are silent; duplicate bases retain fan-out (one ack per component).
+Do not connect monitor output back to the command input: engine-only feedback is
+ignored but still acknowledged and a loopback patch can create a feedback loop.
+
+Lifecycle polling uses the core ticker while listening, including paused worlds
+and non-realtime editor viewports. UDP can still lose/reorder replies: use `/status`
+to reconcile observed state; there are no request IDs, retries or exactly-once guarantees.
+
+Silent conformance tests: `SpatialFabric.OSC.AckFixtures` checks all 34 shared fixture
+decisions and seven golden wire packets (including UTF-8 failure text);
+`SpatialFabric.OSC.AckLifecycle` injects commands/worker events without opening devices
+or a listener. Refresh/check the generated native cases with
+`python -B Tools/generate_osc_ack_tests.py [--check]`; use `--fixture` for a non-sibling
+hub checkout. The shared [contract](https://github.com/NPLAudio/SpatialFabric/blob/main/Specs/OSC-v1.md)
+and [fixtures](https://github.com/NPLAudio/SpatialFabric/blob/main/Fixtures/ack-v1.json)
+now live in the `SpatialFabric` shared hub (formerly `SpatialFabric-Interop`).
+The default local sibling paths remain `SpatialFabric-Interop/Specs/OSC-v1.md`
+and `SpatialFabric-Interop/Fixtures/ack-v1.json` for existing script checkouts.
 
 ### Default versus explicit paths
 

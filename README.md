@@ -22,13 +22,19 @@ Stage, Objects, Radar, Output and Playback.
 
 | Repository | Purpose |
 |---|---|
-| [SpatialFabric](https://github.com/NPLAudio/SpatialFabric) | Unreal plugin, four-room example and standalone OSC Controller |
+| [SpatialFabric](https://github.com/NPLAudio/SpatialFabric) | Shared hub: OSC contracts, JSON schemas, golden wire fixtures and OSC Controller source/releases |
+| [SpatialFabric-Unreal](https://github.com/NPLAudio/SpatialFabric-Unreal) | This Unreal plugin and four-room example |
 | [SpatialFabric-Unity](https://github.com/NPLAudio/SpatialFabric-Unity) | Unity UPM port, native audio backend and four-room walking showcase |
-| [SpatialFabric-Interop](https://github.com/NPLAudio/SpatialFabric-Interop) | Shared OSC contracts, JSON schemas and golden wire fixtures |
+| [SpatialFabric-Godot](https://github.com/NPLAudio/SpatialFabric-Godot) | Godot integration |
 | [AudioLoom](https://github.com/NPLAudio/AudioLoom) | Legacy standalone Unreal playback repository; access-controlled/private, now integrated here |
 
-Unity validation and platform/hardware limits are documented in its own repository;
-Unreal build results do not certify the Unity port or vice versa.
+The former Unreal `SpatialFabric` repository is now `SpatialFabric-Unreal`;
+the former `SpatialFabric-Interop` is now the shared `SpatialFabric` hub.
+Controller source lives in the hub's [`Apps/OSCController`](https://github.com/NPLAudio/SpatialFabric/tree/main/Apps/OSCController).
+Download **OSC Controller 1.4.0** from the [hub 1.0.0 release](https://github.com/NPLAudio/SpatialFabric/releases/tag/v1.0.0).
+
+Unity and Godot validation and platform/hardware limits are documented in their own
+repositories; Unreal build results do not certify those integrations or vice versa.
 
 ## Choose your starting point
 
@@ -39,7 +45,7 @@ Unreal build results do not certify the Unity port or vice versa.
 | Send positions to an external renderer | [Spatial routing](Docs/SpatialRouting.md) |
 | Play cues to a device/channel | [Audio playback and CSV](Docs/AudioPlayback.md) |
 | Query scene configuration as JSON/OSC | [Scene query command and examples](Docs/SceneQuery.md) |
-| Use a standalone OSC desktop controller | [OSC Controller app](Apps/OSCController/README.md) |
+| Use a standalone OSC desktop controller | [Shared OSC Controller app](https://github.com/NPLAudio/SpatialFabric/tree/main/Apps/OSCController) |
 | Connect a controller or inspect packets | [OSC reference](Docs/OSCReference.md) |
 | Find out why something is silent/invisible | [Troubleshooting](Docs/Troubleshooting.md) |
 | Build, test or extend the code | [Development](Docs/Development.md) and [codebase guide](Docs/CODEBASE_GUIDE.md) |
@@ -72,10 +78,11 @@ channels, exclusive mode, latency, all interfaces, or cooked codec playback.
 See [remaining release gates](VALIDATION.md).
 
 The plugin-only release ZIP intentionally omits the example and standalone apps.
-Releases also provide a standalone source-example ZIP, complete-source ZIP and
-portable Windows controller ZIP, with a commit manifest and SHA-256 checksums.
+Unreal releases also provide a standalone source-example ZIP and an Unreal-specific
+complete-source ZIP, with a commit manifest and SHA-256 checksums. Controller source
+and the portable Windows download are released separately in the shared hub.
 The retired presentation is available in the historical
-[2.0.3 release](https://github.com/NPLAudio/SpatialFabric/releases/tag/v2.0.3), not this release.
+[2.0.3 release](https://github.com/NPLAudio/SpatialFabric-Unreal/releases/tag/v2.0.3), not this release.
 A push to main alone does not create a release or version tag.
 
 ## Install into your project
@@ -173,7 +180,7 @@ system sample-accurate or remove driver, converter and network delays.
 
 The operator guides explain both paths; the room example and scene-query tools
 provide a practical walkthrough. Older presentation materials remain in the
-[2.0.3 release archive](https://github.com/NPLAudio/SpatialFabric/releases/tag/v2.0.3).
+[2.0.3 release archive](https://github.com/NPLAudio/SpatialFabric-Unreal/releases/tag/v2.0.3).
 
 ## Validation
 

@@ -4,7 +4,7 @@
  * @file AudioLoomOscSubsystem.h
  * @brief Per-world OSC **UDP server** (incoming triggers) and **client** (outgoing `/state`).
  *
- * **Registry**: `RebuildComponentRegistry` maps OSC paths (`/base/play`, `/base/stop`, `/base/loop`)
+ * **Registry**: `RebuildComponentRegistry` maps cue bases (including unknown command feedback)
  * to `UAudioLoomComponent` weak pointers. Call `RebuildComponentRegistry` when levels or addresses change.
  *
  * Settings: `UAudioLoomOscSettings` (Project Settings). Requires Engine OSC plugin.
@@ -14,12 +14,22 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
+#include "Containers/Ticker.h"
 #include "AudioLoomOscSubsystem.generated.h"
 
 class UAudioLoomComponent;
 class UAudioLoomLiveInputComponent;
 class UOSCClient;
 struct FOSCMessage;
+
+/** Pure command decision; no devices or sockets are touched. */
+struct FAudioLoomOscDecision
+{
+	FString Result = TEXT("rejected");
+	FString Detail;
+	bool bAct = false;
+	float Value = 0.f;
+};
 
 /**
  * World subsystem: OSC UDP listener + monitoring client; editor and PIE worlds each have an instance.
@@ -36,6 +46,11 @@ public:
 
 	/** Numeric play trigger or an address-only message; shared with regression tests. */
 	static bool IsPlayTrigger(const FOSCMessage& Message);
+	static FAudioLoomOscDecision DecideCommand(const FString& Command, const FOSCMessage& Message, bool bLive);
+	static TArray<uint8> MakeAcknowledgement(const FString& Base, const FString& Command, const FString& Result, bool bPlaying, const FString& Detail);
+
+	/** Worker/start failures use the same monitor destination as state updates. */
+	void SendPlayFailure(const FString& Base, const FString& Reason, bool bPlaying);
 
 	/** Stop the OSC server. */
 	UFUNCTION(BlueprintCallable, Category = "AudioLoom|OSC")
@@ -77,6 +92,11 @@ public:
 	virtual void Deinitialize() override;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FSFOscAckLifecycle;
+	TFunction<void(const FString&, const FString&, bool, const FString&)> AckObserver;
+	TFunction<void(bool)> StateObserver;
+#endif
 	/** Exact-bind receiver dispatches validated messages here on the game thread. */
 	void HandleOSCMessage(const FOSCMessage& Message, const FString& IPAddress, uint16 Port);
 
@@ -85,11 +105,14 @@ private:
 	UPROPERTY()
 	UOSCClient* OSCClient; // UDP sender (outgoing /state); recreated when Send IP/Port changes
 
-	/** Full OSC path string → components that should react to …/play */
-	TMap<FString, TArray<TWeakObjectPtr<UAudioLoomComponent>>> PlayTagToComponents;
-	TMap<FString, TArray<TWeakObjectPtr<UAudioLoomComponent>>> StopTagToComponents;
-	TMap<FString, TArray<TWeakObjectPtr<UAudioLoomComponent>>> LoopTagToComponents;
-	TMap<FString, TArray<TWeakObjectPtr<UAudioLoomLiveInputComponent>>> LivePlayTags, LiveStopTags, LiveGainTags;
+	void PollCueEvents();
+	void SendState(const FString& Base, bool bPlaying);
+	FTSTicker::FDelegateHandle MonitoringTicker;
+	void SendAcknowledgement(const FString& Base, const FString& Command, const FString& Result, bool bPlaying, const FString& Detail = FString());
+
+	/** Cue bases, rather than recognized commands: unknown suffixes also need feedback. */
+	TMap<FString, TArray<TWeakObjectPtr<UAudioLoomComponent>>> PlaybackBases;
+	TMap<FString, TArray<TWeakObjectPtr<UAudioLoomLiveInputComponent>>> LiveBases;
 
 	/** Reserved for future debounced registry rebuilds (currently timer drives refresh from panel). */
 	FTimerHandle RebuildRegistryTimer;

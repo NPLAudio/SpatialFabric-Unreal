@@ -1,5 +1,9 @@
 # Validation and release gates
 
+## Cue acknowledgement/status feedback (2026-11-17)
+
+UE 5.8 Win64 Editor build passed, followed by **35 native tests**, zero failed/skipped/in-progress, in an isolated `-NoSound`/NullRHI project. Includes shared acknowledgement fixtures (34 decisions, seven golden packets), observed start/failure/stop/status lifecycle, nested unknown-suffix rejection and live teardown restart protection. The validation gate now requires both acknowledgement tests. Evidence: `C:/Users/davo_/AppData/Local/Temp/SpatialFabricAckFinalGate/`. Validated Editor binaries were copied into this plugin's local `Binaries/` directory. Development/Shipping, hardware playback/capture and other platforms were not revalidated in this pass.
+
 ## Fast checks (no Unreal installation)
 
 ```sh

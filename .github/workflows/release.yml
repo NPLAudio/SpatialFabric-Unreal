@@ -1,4 +1,4 @@
-name: Release Artifacts
+name: Unreal Release Artifacts
 
 on:
   push:
@@ -6,19 +6,16 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version matching SpatialFabric.uplugin; push its tag before publishing'
+        description: 'Version matching SpatialFabric.uplugin'
         required: true
-        default: '2.1.0'
+        default: '2.2.0'
 
 permissions:
   contents: write
 
 jobs:
-  source:
+  release:
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-      controller: ${{ steps.version.outputs.controller }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,15 +26,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate repository and query examples
+      - name: Validate source and query examples
         run: |
           python -m unittest discover -s Tools -p 'test_*.py'
-      - name: Controller and Node checks
-        run: |
-          (cd Apps/OSCController && python -m unittest discover -s tests -v)
           node --test Examples/OSCSceneQuery/test_scene_query.js
       - name: Validate version
-        id: version
         env:
           REQUEST_VERSION: ${{ inputs.version }}
         run: |
@@ -47,71 +40,21 @@ jobs:
           version=json.loads(Path('SpatialFabric.uplugin').read_text())['VersionName']
           requested=os.environ.get('REQUEST_VERSION') if os.environ['GITHUB_EVENT_NAME']=='workflow_dispatch' else os.environ['GITHUB_REF_NAME'].removeprefix('v')
           assert re.fullmatch(r'\d+\.\d+\.\d+',version) and requested==version, 'Tag/input must match descriptor'
-          controller=re.search(r"__version__ = '([^']+)'",Path('Apps/OSCController/osc_controller/__init__.py').read_text()).group(1)
-          with open(os.environ['GITHUB_OUTPUT'],'a') as f: f.write(f'version={version}\ncontroller={controller}\n')
           PY
-      - name: Package source distributions
-        run: python Tools/package_release.py --version '${{ steps.version.outputs.version }}' --output dist/release
+      - name: Package Unreal source distributions
+        run: python Tools/package_release.py --output dist/release
       - uses: actions/upload-artifact@v4
         with:
-          name: release-source
+          name: unreal-release
           path: dist/release/*
           if-no-files-found: error
-
-  windows-controller:
-    needs: source
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-          architecture: x64
-      - name: Build portable Windows controller
-        working-directory: Apps/OSCController
-        run: |
-          python -m pip install -r requirements-build.txt
-          python build_windows.py
-      - name: GUI and packaged no-network checks
-        working-directory: Apps/OSCController
-        shell: pwsh
-        run: |
-          $env:OSC_CONTROLLER_GUI_TESTS = '1'
-          python -m unittest discover -s tests -v
-          if ($LASTEXITCODE -ne 0) { throw 'Controller GUI tests failed' }
-          $report = Join-Path $env:RUNNER_TEMP 'controller-release-smoke.json'
-          Start-Process -FilePath '.\dist\SpatialFabricOSCController.exe' -ArgumentList @('--smoke-test', $report) -Wait
-          if (-not (Test-Path $report)) { throw 'Packaged startup produced no report' }
-          if ((Get-Content $report -Raw | ConvertFrom-Json).status -ne 'passed') { throw 'Packaged startup failed' }
-          Copy-Item 'dist/SpatialFabricOSCController-Windows-x64.zip' 'dist/SpatialFabricOSCController-${{ needs.source.outputs.controller }}-Windows-x64.zip'
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-controller
-          path: Apps/OSCController/dist/SpatialFabricOSCController-${{ needs.source.outputs.controller }}-Windows-x64.zip
-          if-no-files-found: error
-
-  publish:
-    needs: [source, windows-controller]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: release-*
-          path: dist/release
-          merge-multiple: true
-      - name: Finalize checksums
-        run: python Tools/package_release.py --finalize-directory dist/release
-      - name: Publish only if this release does not already exist
+      - name: Publish without overwriting existing validated assets
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: v${{ needs.source.outputs.version }}
         run: |
-          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo 'Release already exists (possibly locally validated/published). Do not overwrite its artifacts or checksums.'
+          TAG="v$(python -c "import json; print(json.load(open('SpatialFabric.uplugin'))['VersionName'])")"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Release exists; not overwriting artifacts or checksums.'
           else
-            gh release create "$RELEASE_TAG" dist/release/* --repo "$GITHUB_REPOSITORY" --verify-tag --title "SpatialFabric ${RELEASE_TAG#v}" --notes-file dist/release/RELEASE_NOTES.md
+            gh release create "$TAG" dist/release/* --repo "$GITHUB_REPOSITORY" --verify-tag --title "SpatialFabric Unreal ${TAG#v}" --notes-file dist/release/RELEASE_NOTES.md
           fi

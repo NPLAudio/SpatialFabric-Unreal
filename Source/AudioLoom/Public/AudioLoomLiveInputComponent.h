@@ -129,12 +129,15 @@ protected:
 
 private:
 	friend class FSFLiveInputState;
+	friend class FSFOscAckLifecycle;
+	friend class UAudioLoomOscSubsystem;
 	void PollBackend();
 	void HandleEvent(const FAudioLoomPlaybackEvent& Event);
 	void RefreshOscRegistry();
 
 	class FAudioLoomLiveBackend* Backend = nullptr;
 	bool bLive = false;
+	bool bTearingDown = false; // state delegates must not restart capture during teardown
 	bool bStartPending = false; // a start request is outstanding; keep polling until the worker reports
 	float InputPeak = 0.f, LatencyMs = 0.f;
 	uint64 Underruns = 0, Overruns = 0;

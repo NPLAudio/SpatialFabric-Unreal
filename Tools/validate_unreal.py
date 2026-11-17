@@ -21,6 +21,8 @@ REQUIRED_TESTS = {
     "SpatialFabric.Playback.RateRoutingAndEOF",
     "SpatialFabric.Playback.TransportReplayCancellation",
     "SpatialFabric.OSC.TypedPlayTriggers",
+    "SpatialFabric.OSC.AckFixtures",
+    "SpatialFabric.OSC.AckLifecycle",
     "SpatialFabric.OSC.LoopbackAndClientReuse",
     "SpatialFabric.OSC.ExactBindAndReceive",
     "SpatialFabric.OSC.CoreTickerLifecycle",

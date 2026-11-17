@@ -44,7 +44,7 @@ void UAudioLoomComponent::BeginDestroy()
 void UAudioLoomComponent::UpdateTickEnabled()
 {
     if (!bAutoReplay) { bReplayPending = false; ReplayCountdown = 0; }
-    SetComponentTickEnabled(IsPlaying() || bWasPlaying || bReplayPending);
+    SetComponentTickEnabled(IsPlaying() || bWasPlaying || bStartPending || bReplayPending);
 }
 void UAudioLoomComponent::PollPlaybackEvents()
 {
@@ -55,7 +55,11 @@ void UAudioLoomComponent::PollPlaybackEvents()
 }
 void UAudioLoomComponent::HandlePlaybackEvent(const FAudioLoomPlaybackEvent& Event)
 {
-    if (bWasPlaying != Event.bPlaying)
+    bStartPending = false;
+    if (!Event.Error.IsEmpty())
+        if (UWorld* W = GetWorld())
+            if (auto* Sub = W->GetSubsystem<UAudioLoomOscSubsystem>()) Sub->SendPlayFailure(GetOscAddress(), Event.Error, Event.bPlaying);
+    if (bWasPlaying != Event.bPlaying || !Event.Error.IsEmpty())
     {
         bWasPlaying = Event.bPlaying;
         if (UWorld* W = GetWorld())
@@ -83,15 +87,23 @@ void UAudioLoomComponent::TickComponent(float Delta, ELevelTick Type, FActorComp
 void UAudioLoomComponent::Play()
 {
     Stop(); // cancel a previous replay and consume the previous stream's stop event
-    if (!AudioBackend) return;
-    if (!SoundWave) { DecodeError = TEXT("No SoundWave assigned"); return; }
+    auto FailStart = [this](const FString& Reason)
+    {
+        DecodeError = Reason;
+        if (UWorld* W = GetWorld())
+            if (auto* Sub = W->GetSubsystem<UAudioLoomOscSubsystem>()) Sub->SendPlayFailure(GetOscAddress(), Reason, IsPlaying());
+    };
+    if (!AudioBackend) { FailStart(TEXT("Playback backend unavailable")); return; }
+    if (!SoundWave) { FailStart(TEXT("No SoundWave assigned")); return; }
     if (!PrepareAudio())
     {
         UE_LOG(LogTemp, Warning, TEXT("SpatialFabric: Cannot decode %s for direct playback"), *GetNameSafe(SoundWave));
+        FailStart(GetLastPlaybackError());
         return;
     }
     StartedWave = SoundWave; StartedDevice = DeviceId; StartedChannel = OutputChannel;
     StartedBuffer = BufferSizeMs; bStartedExclusive = bUseExclusiveMode;
+    bStartPending = true;
     AudioBackend->StartPrepared(DeviceId, PreparedPCM, CachedPCM.NumChannels, OutputChannel, bLoop, bUseExclusiveMode, BufferSizeMs, CachedPCM.SampleRate);
     // Initialization is asynchronous; worker events, not this request, drive monitoring.
     SetComponentTickEnabled(true);
@@ -118,6 +130,7 @@ void UAudioLoomComponent::Stop()
     PollPlaybackEvents();
     bStopping = false;
     bWasPlaying = false;
+    bStartPending = false;
     SetComponentTickEnabled(false);
 }
 bool UAudioLoomComponent::IsPlaying() const { return AudioBackend && AudioBackend->IsPlaying(); }

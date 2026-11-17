@@ -47,6 +47,7 @@ public:
 	bool IsRunning() const;
 
 private:
+	bool bUnsupportedStartPending = false;
 #if PLATFORM_WINDOWS || PLATFORM_MAC
 	TUniquePtr<FAudioLoomLiveBackendImpl> Impl;
 #endif

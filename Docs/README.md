@@ -1,4 +1,11 @@
-# SpatialFabric documentation
+# SpatialFabric Unreal documentation
+
+This is [SpatialFabric-Unreal](https://github.com/NPLAudio/SpatialFabric-Unreal).
+Shared OSC contracts, fixtures and controller source live in the
+[SpatialFabric hub](https://github.com/NPLAudio/SpatialFabric) (formerly `SpatialFabric-Interop`).
+Download OSC Controller 1.4.0 from the [hub 1.0.0 release](https://github.com/NPLAudio/SpatialFabric/releases/tag/v1.0.0).
+[Unity](https://github.com/NPLAudio/SpatialFabric-Unity) and
+[Godot](https://github.com/NPLAudio/SpatialFabric-Godot) have separate repositories and validation.
 
 ## Pick a workflow
 
@@ -26,7 +33,7 @@ pagination and parsing, plus Python, Node.js, Max and Node-RED examples.
 
 - [Playable UE 5.8 source project](../Examples/SpatialFabricShowcase/README.md)
 - [Current release contents and installation](../RELEASE_NOTES.md)
-- [Historical presentation downloads (2.0.3)](https://github.com/NPLAudio/SpatialFabric/releases/tag/v2.0.3)
+- [Historical presentation downloads (2.0.3)](https://github.com/NPLAudio/SpatialFabric-Unreal/releases/tag/v2.0.3)
 - [Current validation evidence and outstanding release gates](../VALIDATION.md)
 - [Remediation/change summary](../FIXES.md)
 - [Task tracking](../TODO.md)

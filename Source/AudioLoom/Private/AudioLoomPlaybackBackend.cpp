@@ -23,7 +23,7 @@
 class FAudioLoomPlaybackBackendImpl
 {
 public:
-    std::atomic<bool> StopRequested{false}, Running{false}, Loop{false};
+    std::atomic<bool> StopRequested{false}, Running{false}, Playing{false}, Loop{false};
     std::atomic<float> Latency{0};
     TQueue<FAudioLoomPlaybackEvent, EQueueMode::Spsc> Events;
     TSharedPtr<const TArray<float>, ESPMode::ThreadSafe> PCM;
@@ -43,8 +43,11 @@ public:
     {
         const bool Completed = RunPlatform();
         Latency = 0;
+        Playing = false;
         Running = false;
-        Events.Enqueue({false, Completed && !StopRequested.load()});
+        FScopeLock Lock(&ErrorLock);
+        if (!Completed && !StopRequested && Error.IsEmpty()) Error = TEXT("Playback worker could not start or continue");
+        Events.Enqueue({false, Completed && !StopRequested.load(), Error});
     }
     bool RunPlatform();
 #if PLATFORM_MAC
@@ -136,6 +139,7 @@ bool FAudioLoomPlaybackBackendImpl::RunPlatform()
     REFERENCE_TIME Delay = 0;
     if (SUCCEEDED(Client->GetStreamLatency(&Delay))) Latency = float(Delay / 10000.0);
     else Latency = Capacity * 1000.f / Rate;
+    Playing = true;
     Events.Enqueue({true, false});
     const auto Sleep = std::chrono::milliseconds(FMath::Clamp(int32(Capacity * 250.0 / Rate), 1, 10));
     double LastProgress = FPlatformTime::Seconds();
@@ -251,6 +255,7 @@ bool FAudioLoomPlaybackBackendImpl::RunPlatform()
     UInt32 Frames = 0; Size = sizeof(Frames);
     AudioObjectGetPropertyData(Device, &Address, 0, nullptr, &Size, &Frames);
     Latency = float(Frames * 1000.0 / Rate);
+    Playing = true;
     Events.Enqueue({true, false});
     while (!StopRequested && !Finished)
     {
@@ -284,11 +289,13 @@ void FAudioLoomPlaybackBackend::StartPrepared(const FString& Id, TSharedPtr<cons
     Stop();
     { FScopeLock Lock(&Impl->ErrorLock); Impl->Error.Empty(); }
     if (Channels <= 0 || Channels > 64 || SourceRate < 8000 || SourceRate > 384000 || !PCM || PCM->Num() == 0 || PCM->Num() % Channels || Channel < 0)
-    { Impl->Fail(TEXT("Invalid source PCM or routing")); Impl->Events.Enqueue({false, false}); return; }
+    { Impl->Fail(TEXT("Invalid source PCM or routing")); Impl->Events.Enqueue({false, false, TEXT("Invalid source PCM or routing")}); return; }
     Impl->PCM = PCM; Impl->Channels = Channels; Impl->SourceRate = SourceRate; Impl->OutputChannel = Channel;
     Impl->DeviceId = Id; Impl->Exclusive = Exclusive; Impl->BufferMs = BufferMs;
     Impl->StopRequested = false; Impl->Loop = Loop; Impl->Running = true;
     Impl->Thread = std::thread([this] { Impl->Run(); });
+#else
+    bUnsupportedStartPending = true;
 #endif
 }
 void FAudioLoomPlaybackBackend::Stop()
@@ -296,7 +303,7 @@ void FAudioLoomPlaybackBackend::Stop()
 #if PLATFORM_WINDOWS || PLATFORM_MAC
     Impl->StopRequested = true;
     if (Impl->Thread.joinable()) Impl->Thread.join();
-    Impl->Running = false; Impl->Latency = 0;
+    Impl->Running = false; Impl->Playing = false; Impl->Latency = 0;
     Impl->PCM.Reset();
 #if PLATFORM_MAC
     Impl->Cursor.Reset(); Impl->Scratch.Reset();
@@ -314,12 +321,14 @@ void FAudioLoomPlaybackBackend::DrainEvents(TArray<FAudioLoomPlaybackEvent>& Eve
 #if PLATFORM_WINDOWS || PLATFORM_MAC
     FAudioLoomPlaybackEvent Event;
     while (Impl->Events.Dequeue(Event)) Events.Add(Event);
+#else
+    if (bUnsupportedStartPending) { Events.Add({false, false, GetLastError()}); bUnsupportedStartPending = false; }
 #endif
 }
 bool FAudioLoomPlaybackBackend::IsPlaying() const
 {
 #if PLATFORM_WINDOWS || PLATFORM_MAC
-    return Impl->Running.load();
+    return Impl->Playing.load();
 #else
     return false;
 #endif

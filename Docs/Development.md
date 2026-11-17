@@ -110,24 +110,39 @@ are required. The checked-in manifest supplies file hashes/provenance for review
 
 ## Distribution boundaries
 
-GitHub contains the source plugin, published example, controller and query clients.
-The plugin-only release ZIP excludes Examples/Apps so installation does not import
-sample projects or unrelated desktop tools. The example release ZIP contains its
-project-local source plugin; it still requires a matching engine/toolchain. The
-Windows controller ZIP bundles Python/Tk and needs no Unreal installation.
+[SpatialFabric-Unreal](https://github.com/NPLAudio/SpatialFabric-Unreal) contains the
+source plugin, published example and query clients. The plugin-only release ZIP
+excludes Examples/Apps so installation does not import sample projects or unrelated
+desktop tools. The example release ZIP contains its project-local source plugin;
+it still requires a matching engine/toolchain. CompleteSource is Unreal-specific
+and does not include controller source or an executable.
+
+The controller source moved to the shared hub's
+[`Apps/OSCController`](https://github.com/NPLAudio/SpatialFabric/tree/main/Apps/OSCController).
+The hub was formerly named `SpatialFabric-Interop`; it is now `SpatialFabric`.
+Download OSC Controller 1.4.0 separately from the
+[hub 1.0.0 release](https://github.com/NPLAudio/SpatialFabric/releases/tag/v1.0.0).
+Its Windows ZIP bundles Python/Tk and needs no Unreal installation.
 
 After tests and committing a clean worktree, build release archives locally:
 
 ```sh
-python Tools/package_release.py --version 2.1.0 --output dist/releases/2.1.0 --controller-zip Apps/OSCController/dist/1.2.0/SpatialFabricOSCController-Windows-x64.zip
+python Tools/package_release.py --version 2.2.0 --output dist/releases/2.2.0
 ```
 
 The packager validates descriptor/version, excludes generated/private directories,
-prepares the self-contained example and emits a commit manifest/checksums. Build
-and smoke-test the controller first; do not package an arbitrary old executable.
-Tagging `v2.1.0` runs source/Node/controller checks and release builds in CI. If a
-release already exists, CI preserves its validated assets rather than overwriting
-them with independently rebuilt binaries/checksums.
+prepares the self-contained example and emits a commit manifest/checksums. By default,
+2.2.0 packaging produces only Unreal archives, with no controller ZIP. For an explicit
+optional copy of a separately validated hub controller artifact, supply both flags:
+
+```sh
+python Tools/package_release.py --version 2.2.0 --output dist/releases/2.2.0 --controller-zip C:/downloads/SpatialFabricOSCController-1.4.0-Windows-x64.zip --controller-version 1.4.0
+```
+
+Use the hub release's validated ZIP with runtime license notices, not an arbitrary
+old executable. Controller builds/tests belong to the hub, not the Unreal release.
+If a release already exists, CI preserves its validated assets rather than
+overwriting them with independently rebuilt binaries/checksums.
 
 Do not version Binaries, Intermediate, Saved, DerivedDataCache, IDE state, device
 credentials, local `.pi`/MCP data or raw validation logs with local identifiers.

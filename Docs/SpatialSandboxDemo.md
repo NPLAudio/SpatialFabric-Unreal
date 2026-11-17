@@ -8,7 +8,7 @@ now versioned under `Examples/SpatialFabricShowcase`; prepare a portable copy wi
 wholesale. Reproducible generators/inspection tools are in `Tools/Unreal/`.
 
 For setup, start with [Getting started](GettingStarted.md). Older talk/deck materials
-remain in the [2.0.3 archive](https://github.com/NPLAudio/SpatialFabric/releases/tag/v2.0.3);
+remain in the [2.0.3 archive](https://github.com/NPLAudio/SpatialFabric-Unreal/releases/tag/v2.0.3);
 this room tour supersedes their open-gallery walkthrough.
 
 ## Tour

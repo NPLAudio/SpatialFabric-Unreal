@@ -199,6 +199,7 @@ private:
 	class FAudioLoomPlaybackBackend* AudioBackend = nullptr;
 	/** Previous-frame playing state (for auto-replay edge detection). */
 	bool bWasPlaying = false;
+	bool bStartPending = false; // keep polling throughout asynchronous initialization
 	/** Seconds remaining before next `Play()` when auto-replay countdown is active. */
 	float ReplayCountdown = 0.0f;
 	bool bReplayPending = false;
@@ -212,6 +213,8 @@ private:
 	int32 StartedChannel = 0, StartedBuffer = 0;
 	bool bStartedExclusive = false;
 	friend class FSFTransportState;
+	friend class FSFOscAckLifecycle;
+	friend class UAudioLoomOscSubsystem;
 	void HandlePlaybackEvent(const FAudioLoomPlaybackEvent& Event);
 	void PollPlaybackEvents();
 	void RefreshOscRegistry();

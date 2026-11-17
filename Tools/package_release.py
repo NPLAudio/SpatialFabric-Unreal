@@ -57,7 +57,7 @@ def finalize(folder):
     return manifest
 
 
-def package(version,output,controller_zip=None):
+def package(version,output,controller_zip=None,controller_version=None):
     descriptor=json.loads((ROOT/'SpatialFabric.uplugin').read_text(encoding='utf-8'))
     if not re.fullmatch(r'\d+\.\d+\.\d+',version) or descriptor['VersionName']!=version:raise ValueError('Release version must exactly match the descriptor semantic version')
     status=subprocess.check_output(['git','status','--porcelain'],cwd=ROOT,text=True)
@@ -74,8 +74,8 @@ def package(version,output,controller_zip=None):
         project=prepare(Path(temp)/'SpatialFabricShowcase')
         files=[p for p in project.parent.rglob('*') if p.is_file() and not p.is_symlink() and included(p.relative_to(project.parent))]
         archive(output/f'SpatialFabric-Example-{version}.zip',project.parent,sorted(files),'SpatialFabricShowcase',epoch)
-    controller_version=re.search(r"__version__ = '([^']+)'",(ROOT/'Apps/OSCController/osc_controller/__init__.py').read_text()).group(1)
     if controller_zip:
+        if not controller_version or not re.fullmatch(r'\d+\.\d+\.\d+',controller_version):raise ValueError('External controller ZIP requires --controller-version')
         with ZipFile(controller_zip) as zipped:
             names=zipped.namelist()
             if not any(n.endswith('/SpatialFabricOSCController.exe') for n in names) or not any('/runtime-licenses/' in n for n in names):raise ValueError('Controller ZIP must contain the executable and runtime license notices')
@@ -88,11 +88,11 @@ def package(version,output,controller_zip=None):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(__doc__)
-    parser.add_argument('--version');parser.add_argument('--output',type=Path);parser.add_argument('--controller-zip',type=Path)
+    parser.add_argument('--version');parser.add_argument('--output',type=Path);parser.add_argument('--controller-zip',type=Path);parser.add_argument('--controller-version',help='Version of optional controller from the shared hub')
     parser.add_argument('--finalize-directory',type=Path,help='Rebuild manifest/checksums after CI merges source and Windows artifacts')
     args=parser.parse_args()
     if args.finalize_directory:result=finalize(args.finalize_directory)
     else:
         version=args.version or json.loads((ROOT/'SpatialFabric.uplugin').read_text())['VersionName']
-        result=package(version,args.output or ROOT/'dist/releases'/version,args.controller_zip)
+        result=package(version,args.output or ROOT/'dist/releases'/version,args.controller_zip,args.controller_version)
     print(json.dumps(result,indent=2))
