@@ -12,7 +12,11 @@ import subprocess
 import threading
 import time
 import unittest
+from pathlib import Path
 from osc_controller.debugger import Debugger
+from osc_controller.model import load_profile
+from osc_controller.receiver_hub import ReceiverHub
+from osc_controller.tracker import ObjectTracker
 from osc_controller.protocol import Message, encode
 
 GODOT, PROJECT = os.environ.get('GODOT_EXE'), os.environ.get('GODOT_PROJECT')
@@ -81,6 +85,25 @@ class RealEngine(unittest.TestCase):
         self.assertTrue(all('no default fallback' in text for text in unconfirmed), unconfirmed)
         typo = next(r for r in self.debugger.records if r.address == '/godot/playbak/mono/play')
         self.assertEqual(typo.severity, 'error'); self.assertFalse(typo.forwarded); self.assertIn('/godot/playback/mono/play', typo.findings[0].text)
+
+
+    def test_controller_with_the_godot_profile_receives_the_engines_osc_output(self):
+        """What the user saw: the controller must receive positions from the running engine on the profile's ports."""
+        self.debugger.stop()   # setUp bound the state port for the debugger tests; the controller needs it here
+        profile = load_profile(Path(__file__).resolve().parents[1] / 'profiles/spatialfabric-godot.json')
+        hub = ReceiverHub(); tracker = ObjectTracker(); states = []
+        try:
+            hub.start('tracker', [(profile.tracker_ip, port) for port in profile.tracker_ports])
+            hub.start('monitor', [(profile.monitor_ip, profile.monitor_port)])
+            end = time.monotonic() + 10
+            while time.monotonic() < end and len(tracker.objects) < 4:
+                for (ip, port), event in hub.poll():
+                    if event[0] == 'message': tracker.ingest(event[3], event[2][0], port, event[1])
+                time.sleep(0.01)
+        finally: hub.close()
+        ids = sorted(key.rsplit(':', 1)[-1] for key in tracker.objects)   # keys look like ADM:ip:port:id
+        self.assertEqual(ids, ['1', '2', '3', '4'], f'ids {ids} accepted={tracker.accepted} ignored={tracker.ignored}')
+        self.assertGreater(tracker.accepted, 10)
 
 
 if __name__ == '__main__': unittest.main()

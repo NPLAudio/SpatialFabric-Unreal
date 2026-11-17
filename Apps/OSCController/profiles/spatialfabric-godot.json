@@ -1,0 +1,43 @@
+{
+  "schema_version": 1,
+  "playback_ip": "127.0.0.1",
+  "playback_port": 9200,
+  "monitor_ip": "127.0.0.1",
+  "monitor_port": 9201,
+  "spatial_ip": "127.0.0.1",
+  "spatial_port": 50029,
+  "tracker_ip": "127.0.0.1",
+  "tracker_ports": [
+    50029,
+    9202
+  ],
+  "query_ip": "127.0.0.1",
+  "query_port": 9200,
+  "query_reply_port": 9011,
+  "object_id": 1,
+  "front": 0.0,
+  "right": 0.0,
+  "up": 0.0,
+  "gain": 1.0,
+  "width": 0.0,
+  "send_hz": 20,
+  "cues": [
+    {
+      "name": "Warm percussion / output 1",
+      "base": "/godot/playback/mono"
+    },
+    {
+      "name": "Stereo groove / matching L-R",
+      "base": "/godot/playback/stereo"
+    },
+    {
+      "name": "Glass / output 2 / replay",
+      "base": "/godot/playback/replay"
+    },
+    {
+      "name": "Live input (mic / line in)",
+      "base": "/godot/live/input",
+      "kind": "live"
+    }
+  ]
+}

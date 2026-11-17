@@ -153,6 +153,12 @@ acknowledged, and `/state` is sent only when the worker state changes. Live comp
 **Godot** engine only (headless, silent, via `SpatialFabric-Godot/Tests/Godot/serve_for_debugger.gd`); Unity and Unreal
 were not run live for this feature. The checked-in Windows executable was not rebuilt.
 
+## Profiles for other engines
+
+`profiles/spatialfabric-godot.json` matches the Godot example (input `9200`, ADM `50029`, state `9201`, cue bases `/godot/...` and a
+live-input cue). Engines use different default ports on purpose; load the matching profile or the controller will listen on the
+wrong ports and show nothing. The Unity example ships its own profile under `ExampleProject/OSCControllerProfile.json`.
+
 ## Spatial / renderer
 
 The pad is **direct ADM renderer control**. It does **not** move Unreal actors,
