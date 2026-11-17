@@ -18,14 +18,19 @@ def endpoint(ip, port, listen=False):
     return str(address), port
 
 
+CUE_KINDS = ('playback', 'live')
+
+
 @dataclass
 class Cue:
     name: str
     base: str
+    kind: str = 'playback'  # 'live' = microphone/line-in cue: /play starts, /stop stops, /gain sets level
 
     def validate(self):
         if not isinstance(self.name, str) or not self.name.strip() or len(self.name) > 80: raise ValueError('Cue name must be 1..80 characters')
         if not valid_address(self.base) or len(self.base) > 256: raise ValueError('Cue base must be a valid OSC path, <=256 characters')
+        if self.kind not in CUE_KINDS: raise ValueError('Cue kind must be playback or live')
 
 
 @dataclass

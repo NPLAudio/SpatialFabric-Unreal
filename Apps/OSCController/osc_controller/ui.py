@@ -106,14 +106,15 @@ class Controller(tk.Tk):
         self._cue_tab(cue_tab); self._spatial_tab(spatial_tab); self._composer_tab(composer_tab); self._monitor_tab(monitor_tab)
 
     def _cue_tab(self, frame):
-        self._label(frame, 'Select a cue, then send a transport command. No automatic playback on launch or profile load.', style='Muted.TLabel').pack(anchor='w', pady=(0, 12))
-        self.cues = ttk.Treeview(frame, columns=('name', 'base', 'state'), show='headings', selectmode='browse', height=9)
-        for key, label, width in [('name', 'Cue', 310), ('base', 'OSC base', 320), ('state', 'Last reported worker state', 260)]:
+        self._label(frame, 'Select a cue, then send a transport command. No automatic playback on launch or profile load.\nLive-input cues: Play starts the remote microphone/line-in bridge (asks first), Stop ends it, Live gain sets level 0..4.', style='Muted.TLabel').pack(anchor='w', pady=(0, 12))
+        self.cues = ttk.Treeview(frame, columns=('name', 'kind', 'base', 'state'), show='headings', selectmode='browse', height=9)
+        for key, label, width in [('name', 'Cue', 260), ('kind', 'Type', 90), ('base', 'OSC base', 280), ('state', 'Last reported worker state', 240)]:
             self.cues.heading(key, text=label); self.cues.column(key, width=width)
         self.cues.pack(fill='both', expand=True)
         buttons = ttk.Frame(frame); buttons.pack(fill='x', pady=12)
         for label, op, value, style in [('▶  Play', 'play', 1.0, 'TButton'), ('■  Stop', 'stop', None, 'Stop.TButton'), ('Loop ON', 'loop', 1.0, 'TButton'), ('Loop OFF / drain', 'loop', 0.0, 'TButton')]:
             ttk.Button(buttons, text=label, style=style, command=lambda o=op, v=value: self.cue_send(o, v)).pack(side='left', padx=(0, 8))
+        ttk.Button(buttons, text='Live gain…', command=self.live_gain_dialog).pack(side='left', padx=(8, 8))
         for label, action in [('Add cue…', self.add_cue), ('Edit…', self.edit_cue), ('Remove', self.remove_cue)]:
             ttk.Button(buttons, text=label, command=action).pack(side='right', padx=4)
         box = ttk.LabelFrame(frame, text='State is evidence, not an audio-level meter', padding=12); box.pack(fill='x')
@@ -170,7 +171,7 @@ class Controller(tk.Tk):
         scroll.pack(side='right', fill='y'); self.log.pack(fill='both', expand=True)
 
     def _current_profile(self):
-        data = {'schema_version': 1, 'cues': [{'name': c.name, 'base': c.base} for c in self.profile.cues]}
+        data = {'schema_version': 1, 'cues': [{'name': c.name, 'base': c.base, 'kind': c.kind} for c in self.profile.cues]}
         for name in ('playback_ip', 'monitor_ip', 'spatial_ip'): data[name] = self.vars[name].get().strip()
         for name in ('playback_port', 'monitor_port', 'spatial_port', 'object_id', 'send_hz'):
             try: data[name] = int(self.vars[name].get())
@@ -198,7 +199,7 @@ class Controller(tk.Tk):
 
     def _refresh_cues(self):
         self.cues.delete(*self.cues.get_children())
-        for i, cue in enumerate(self.profile.cues): self.cues.insert('', 'end', iid=str(i), values=(cue.name, cue.base, 'Unknown — no state received'))
+        for i, cue in enumerate(self.profile.cues): self.cues.insert('', 'end', iid=str(i), values=(cue.name, 'Live input' if cue.kind == 'live' else 'Playback', cue.base, 'Unknown — no state received'))
         if self.profile.cues: self.cues.selection_set('0')
 
     def _selected(self):
@@ -228,9 +229,30 @@ class Controller(tk.Tk):
         try:
             cue = self.profile.cues[self._selected()]
             ip, port = endpoint(self.vars['playback_ip'].get().strip(), int(self.vars['playback_port'].get()))
+            if cue.kind == 'live':
+                if operation == 'loop': raise ValueError('Loop does not apply to a live input cue')
+                if operation == 'play' and not messagebox.askyesno('Start live input?', f'Ask {ip}:{port} to open its microphone/line input for "{cue.name}" and play it through its output.\n\nThe remote machine may show a microphone permission prompt. Use headphones or low gain: a microphone near its own speakers feeds back. UDP is not acknowledged; watch the reported state.', parent=self): return
             args = () if value is None else (('f', value),)
             self._send(ip, port, Message(cue.base + '/' + operation, args))
         except (ValueError, OSError) as error: self._error(error)
+
+    def send_live_gain(self, value):
+        """Explicit live-input gain command: finite 0..4 only, live cues only."""
+        try:
+            cue = self.profile.cues[self._selected()]
+            if cue.kind != 'live': raise ValueError('Select a live-input cue to set its gain')
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not 0 <= value <= 4: raise ValueError('Live gain must be a finite number from 0 to 4')
+            ip, port = endpoint(self.vars['playback_ip'].get().strip(), int(self.vars['playback_port'].get()))
+            self._send(ip, port, Message(cue.base + '/gain', (('f', float(value)),)))
+        except (ValueError, OSError) as error: self._error(error)
+
+    def live_gain_dialog(self):
+        try:
+            cue = self.profile.cues[self._selected()]
+            if cue.kind != 'live': raise ValueError('Select a live-input cue to set its gain')
+            value = simpledialog.askfloat('Live gain', 'Linear gain 0..4 (1 = unity; output is always clamped):', initialvalue=1.0, minvalue=0.0, maxvalue=4.0, parent=self)
+            if value is not None: self.send_live_gain(value)
+        except ValueError as error: self._error(error)
 
     def stop_all(self):
         self.live.set(False)
@@ -245,13 +267,15 @@ class Controller(tk.Tk):
         if name is None: return None
         base = simpledialog.askstring('OSC base', 'Base only (no /play suffix):', initialvalue=cue.base if cue else '/demo/playback/new', parent=self)
         if base is None: return None
-        result = Cue(name, base); result.validate(); return result
+        kind = simpledialog.askstring('Cue type', 'Type: playback or live (microphone/line-in):', initialvalue=cue.kind if cue else 'playback', parent=self)
+        if kind is None: return None
+        result = Cue(name, base, kind.strip().lower()); result.validate(); return result
 
     def add_cue(self):
         try:
             cue = self._cue_editor()
             if cue:
-                data = self._current_profile().to_dict(); data['cues'].append({'name': cue.name, 'base': cue.base})
+                data = self._current_profile().to_dict(); data['cues'].append({'name': cue.name, 'base': cue.base, 'kind': cue.kind})
                 self._apply_profile(Profile.from_dict(data))
         except ValueError as error: self._error(error)
 
@@ -259,7 +283,7 @@ class Controller(tk.Tk):
         try:
             index = self._selected(); cue = self._cue_editor(self.profile.cues[index])
             if cue:
-                data = self._current_profile().to_dict(); data['cues'][index] = {'name': cue.name, 'base': cue.base}
+                data = self._current_profile().to_dict(); data['cues'][index] = {'name': cue.name, 'base': cue.base, 'kind': cue.kind}
                 self._apply_profile(Profile.from_dict(data))
         except ValueError as error: self._error(error)
 
@@ -345,18 +369,19 @@ class Controller(tk.Tk):
         try:
             cues = {}; duplicates = 0
             for row in scene['objects']:
-                if row['kind'] != 'playback': continue
-                cue = Cue((str(row.get('actor_label', row.get('name', 'Cue'))) + ' / ' + str(row.get('name', '')) )[:80], row.get('osc_base', ''))
+                if row['kind'] not in ('playback', 'live_input'): continue
+                live = row['kind'] == 'live_input'
+                cue = Cue((str(row.get('actor_label', row.get('name', 'Cue'))) + ' / ' + ('live input' if live else str(row.get('name', ''))))[:80], row.get('osc_base', ''), 'live' if live else 'playback')
                 cue.validate()
                 if cue.base in cues: duplicates += 1
                 else: cues[cue.base] = cue
-            if not cues: raise ValueError('No playback components found in this world')
+            if not cues: raise ValueError('No playback or live-input components found in this world')
             if len(cues) > 64: raise ValueError('More than 64 distinct cue bases; choose a subset in a profile instead of silently truncating')
             network = scene.get('playback_network', {})
             port = network.get('bound_port') or network.get('configured_listen_port')
             endpoint(self.scene_origin_ip, port)
             if not messagebox.askyesno('Import discovered routing', f'Replace this app\'s cue list with {len(cues)} bases and set playback destination to {self.scene_origin_ip}:{port}?\n\nDuplicate bases merged: {duplicates}. No commands or Unreal configuration changes will be sent.', parent=self): return
-            data = self._current_profile().to_dict(); data['cues'] = [{'name':c.name,'base':c.base} for c in cues.values()]
+            data = self._current_profile().to_dict(); data['cues'] = [{'name':c.name,'base':c.base,'kind':c.kind} for c in cues.values()]
             data['playback_ip'] = self.scene_origin_ip; data['playback_port'] = port
             self._apply_profile(Profile.from_dict(data)); self.tracker.set_scene(scene, self.scene_origin_ip, time.monotonic())
             self.status.set('Discovered cues imported locally; live disabled; no commands sent. Save profile explicitly to persist.')
@@ -446,7 +471,7 @@ class Controller(tk.Tk):
             self._draw_pad(); self.last_pad_redraw = now
         for i,cue in enumerate(self.profile.cues):
             state = self.cue_states.get(cue.base)
-            label = ('Last: ' + ('PLAYING' if state[0] else 'stopped') + f' · {now-state[1]:.0f}s ago') if state else 'Unknown — no state received'
+            label = ('Last: ' + (('LIVE' if cue.kind == 'live' else 'PLAYING') if state[0] else 'stopped') + f' · {now-state[1]:.0f}s ago') if state else 'Unknown — no state received'
             self.cues.set(str(i), 'state', label)
         if self.live.get() and self.spatial_dirty:
             try: hz = int(self.vars['send_hz'].get())

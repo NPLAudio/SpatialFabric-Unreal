@@ -105,6 +105,33 @@ class ProfileTests(unittest.TestCase):
             self.assertEqual(path.read_text(),'keep')
 
 
+class LiveCueTests(unittest.TestCase):
+    def test_kind_defaults_to_playback_and_old_profiles_still_load(self):
+        self.assertEqual(Cue('a', '/a').kind, 'playback')
+        profile = Profile.from_dict({'schema_version': 1, 'cues': [{'name': 'Old', 'base': '/old'}]})
+        self.assertEqual(profile.cues[0].kind, 'playback')
+
+    def test_live_cue_round_trips_through_a_saved_profile(self):
+        profile = Profile.from_dict({'schema_version': 1, 'cues': [{'name': 'Mic', 'base': '/audioloom/x/live/1', 'kind': 'live'}, {'name': 'Cue', 'base': '/demo/mono'}]})
+        self.assertEqual([c.kind for c in profile.cues], ['live', 'playback'])
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / 'p.json'
+            save_profile(path, profile)
+            self.assertEqual([c.kind for c in load_profile(path).cues], ['live', 'playback'])
+            self.assertEqual(json.loads(path.read_text(encoding='utf-8'))['cues'][0]['kind'], 'live')
+
+    def test_unknown_or_malformed_kind_is_rejected(self):
+        for kind in ('mic', '', 'LIVE', None, 1, ['live']):
+            with self.subTest(kind=kind), self.assertRaises(ValueError):
+                Profile.from_dict({'schema_version': 1, 'cues': [{'name': 'x', 'base': '/x', 'kind': kind}]})
+
+    def test_live_commands_encode_as_documented(self):
+        self.assertEqual(decode(encode(Message('/audioloom/a/live/1/play', (('f', 1.0),))))[0].address, '/audioloom/a/live/1/play')
+        gain = decode(encode(Message('/audioloom/a/live/1/gain', (('f', 2.5),))))[0]
+        self.assertEqual(gain.args, (('f', 2.5),))
+        self.assertEqual(decode(encode(Message('/audioloom/a/live/1/stop')))[0].args, ())
+
+
 class NetworkTests(unittest.TestCase):
     def free_port(self):
         with socket.socket(socket.AF_INET,socket.SOCK_DGRAM) as sock:

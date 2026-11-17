@@ -72,6 +72,33 @@ test, or proof of correct channels**. Startup is Unknown. No packets after a sen
 may mean the stream never started, monitoring is mispatched, or UDP was lost.
 Historic state remains labelled with its age even after monitoring stops.
 
+## Live-input cues (microphone / line in)
+
+A cue has a **Type**: *Playback* (default) or *Live input*. A live-input cue controls a
+`UAudioLoomLiveInputComponent`, Unity `LiveInputCue` or Godot `SpatialFabricLiveInputCue`, which routes a
+capture device to an output device on the **remote** machine. The controller itself never captures or plays audio.
+
+| Button | Sends for a live cue |
+|---|---|
+| **Play** | `<base>/play` (float 1.0), only after a confirmation dialog. It asks the remote machine to open its microphone/line input (the OS may prompt there) and play it through its output. |
+| **Stop** | `<base>/stop` (no confirmation; also included in Stop All) |
+| **Live gain...** | `<base>/gain` with one finite float 0..4; other values are refused locally |
+| Loop ON/OFF | Refused: loop does not apply to a live input |
+
+The state column shows the last reported `<base>/state` as **LIVE** or *stopped*. That is the remote audio
+worker's observed lifecycle, not proof of sound at a loudspeaker, and UDP sends are never acknowledged.
+Import from **Query scene** adds `live_input` records as live cues and, like playback import, only
+replaces the cue list locally after confirmation and sends nothing, so discovery can never open a microphone.
+
+Profiles gain an optional per-cue `"kind": "live"` (default `"playback"`; older profiles load unchanged and
+unknown kinds are rejected):
+
+```json
+{ "name": "Stage mic", "base": "/audioloom/Stage/live/1", "kind": "live" }
+```
+
+**A microphone near the speakers it feeds will howl:** use headphones or a low gain. Start only deliberately.
+
 ## Spatial / renderer
 
 The pad is **direct ADM renderer control**. It does **not** move Unreal actors,
@@ -241,6 +268,8 @@ python -m unittest discover -s tests -v
 # Check packaged startup without sending or binding:
 dist\SpatialFabricOSCController.exe --smoke-test "$env:TEMP\osc-smoke.json"
 ```
+
+**Live-input cues (unreleased, source only):** 43 tests pass (34 core, including 4 new model tests, plus 9 interactive GUI tests, 4 of them new, run with the GUI flag set): kind validation and old-profile compatibility, profile round trip, confirmed Start that sends nothing when declined, unconfirmed Stop, refused Loop, bounded Gain (NaN/inf/bool/string/out-of-range refused), `live_input` import that sends nothing, and the LIVE state label. The checked-in Windows executable and ZIP were **not rebuilt**; rebuild with `build_windows.py` before distributing. The controller was not run against a live Unreal/Unity/Godot instance for this feature (wire format and addresses are covered by encode/decode tests and each engine's own tests).
 
 Local validation: Windows 11 x64, Python 3.13.14 / Tk 8.6; **30 core tests and
 5 interactive GUI tests passed**, including paged scene queries and confirmed cue

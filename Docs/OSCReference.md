@@ -6,7 +6,7 @@
 
 The independent [OSC Controller desktop app](../Apps/OSCController/README.md) provides
 cue Play/Stop/Loop, worker-state monitoring, direct ADM renderer controls and a typed
-message composer. It runs without Unreal and never auto-sends on startup. Its spatial
+message composer, plus **live-input cues** (confirmed Start, Stop, bounded Gain; see the controller README). It runs without Unreal and never auto-sends on startup. Its spatial
 pad controls a renderer directly; it does not remotely move Unreal actors.
 
 ## Read-only scene discovery

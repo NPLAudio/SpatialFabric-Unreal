@@ -126,4 +126,78 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(self.receive().args, (('s','Hello world'),('i',2)))
 
 
+    def _use_live_cue(self):
+        from osc_controller.model import Profile
+        self.app._apply_profile(Profile.from_dict({'schema_version': 1, 'cues': [
+            {'name': 'Playback', 'base': '/demo/mono'}, {'name': 'Mic', 'base': '/audioloom/a/live/1', 'kind': 'live'}]}))
+        self.app.vars['playback_port'].set(str(self.capture.getsockname()[1]))  # applying a profile resets endpoints
+        self.app.cues.selection_set('1'); self.app.update()
+
+    def test_live_cue_start_needs_confirmation_and_never_sends_when_declined(self):
+        from unittest.mock import patch
+        self._use_live_cue()
+        self.assertIn('Live input', self.app.cues.set('1', 'kind'))
+        before = self.app.tx
+        with patch('osc_controller.ui.messagebox.askyesno', return_value=False) as ask:
+            self.app.cue_send('play', 1.0)
+        self.assertTrue(ask.called); self.assertEqual(self.app.tx, before)
+        with patch('osc_controller.ui.messagebox.askyesno', return_value=True):
+            self.app.cue_send('play', 1.0)
+        message = self.receive()
+        self.assertEqual((message.address, message.args), ('/audioloom/a/live/1/play', (('f', 1.0),)))
+
+    def test_live_stop_needs_no_confirmation_and_loop_is_refused(self):
+        from unittest.mock import patch
+        self._use_live_cue()
+        with patch('osc_controller.ui.messagebox.askyesno') as ask:
+            self.app.cue_send('stop', None)
+            self.assertFalse(ask.called)
+        self.assertEqual(self.receive().address, '/audioloom/a/live/1/stop')
+        before = self.app.tx
+        self.app.cue_send('loop', 1.0)
+        self.assertEqual(self.app.tx, before); self.assertIn('Loop does not apply', self.app.status.get())
+
+    def test_live_gain_is_bounded_and_only_for_live_cues(self):
+        self._use_live_cue()
+        before = self.app.tx
+        for bad in (-0.1, 4.1, float('nan'), float('inf'), True, '1'):
+            self.app.send_live_gain(bad)
+        self.assertEqual(self.app.tx, before)
+        self.app.send_live_gain(2.5)
+        message = self.receive()
+        self.assertEqual((message.address, message.args), ('/audioloom/a/live/1/gain', (('f', 2.5),)))
+        self.app.cues.selection_set('0'); self.app.update(); before = self.app.tx
+        self.app.send_live_gain(1.0)
+        self.assertEqual(self.app.tx, before); self.assertIn('live-input cue', self.app.status.get())
+
+    def test_discovered_live_input_imports_as_a_live_cue_and_state_reads_live(self):
+        import json
+        from unittest.mock import patch
+        from osc_controller.protocol import Message, encode
+        from osc_controller.scene_query import SCHEMA, RESPONSE, QUERY
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            probe.bind(('127.0.0.1', 0)); reply_port = probe.getsockname()[1]
+        self.app.tracker.query_port.set(str(self.capture.getsockname()[1]))
+        self.app.tracker.reply_port.set(str(reply_port)); self.app.query_scene()
+        request = self.receive(); self.assertEqual(request.address, QUERY)
+        rows = [{'kind': 'playback', 'key': '/a/cue', 'actor_label': 'Cue', 'name': 'AudioLoom', 'osc_base': '/new/cue'},
+                {'kind': 'live_input', 'key': '/a/mic', 'actor_label': 'Mic', 'name': 'LiveInput', 'osc_base': '/new/live'}]
+        data = {'schema': SCHEMA, 'schema_version': 1, 'world': '/Game/Test', 'offset': 0, 'limit': 64, 'returned': 2, 'total': 2, 'next_offset': -1,
+                'objects': rows, 'playback_network': {'bound_port': self.capture.getsockname()[1]}}
+        self.capture.sendto(encode(Message(RESPONSE, (('s', request.args[0][1]), ('i', 0), ('i', 1), ('s', json.dumps(data))))), ('127.0.0.1', reply_port))
+        until = time.monotonic() + 2
+        while self.app.tracker.scene is None and time.monotonic() < until:
+            self.app.update(); time.sleep(.01)
+        count = self.app.tx
+        with patch('osc_controller.ui.messagebox.askyesno', return_value=True): self.app.import_discovered_cues()
+        self.assertEqual({c.base: c.kind for c in self.app.profile.cues}, {'/new/cue': 'playback', '/new/live': 'live'})
+        self.assertEqual(self.app.tx, count)  # Import never sends commands (so it can never open a remote microphone).
+        live_index = [c.base for c in self.app.profile.cues].index('/new/live')
+        self.app.cue_states['/new/live'] = (True, time.monotonic()); self.app._pump_once() if hasattr(self.app, '_pump_once') else self.app.update()
+        until = time.monotonic() + 2
+        while time.monotonic() < until and 'LIVE' not in self.app.cues.set(str(live_index), 'state'):
+            self.app.update(); time.sleep(.01)
+        self.assertIn('LIVE', self.app.cues.set(str(live_index), 'state'))
+
+
 if __name__ == '__main__': unittest.main()
