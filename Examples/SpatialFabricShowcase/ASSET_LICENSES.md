@@ -13,9 +13,9 @@ animation package is bundled in this example.
 | Unreal engine/runtime dependencies | Require a valid Unreal Engine installation and applicable Epic terms |
 
 Epic's Unreal Engine terms: https://www.unrealengine.com/eula/unreal
-Repository license: https://github.com/NPLAudio/SpatialFabric/blob/main/LICENSE
-Artwork provenance: https://github.com/NPLAudio/SpatialFabric/blob/main/assets/README.md
-AudioLoom notice: https://github.com/NPLAudio/SpatialFabric/blob/main/ThirdParty/AudioLoom/LICENSE
+Repository license: https://github.com/NPLAudio/SpatialFabric-Unreal/blob/main/LICENSE
+Artwork provenance: https://github.com/NPLAudio/SpatialFabric-Unreal/blob/main/assets/README.md
+AudioLoom notice: https://github.com/NPLAudio/SpatialFabric-Unreal/blob/main/ThirdParty/AudioLoom/LICENSE
 
 The local development SpatialSandbox uses pre-existing FirstPerson template content;
 that content is deliberately **not copied** into this published example. The example

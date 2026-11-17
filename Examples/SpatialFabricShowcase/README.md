@@ -116,11 +116,11 @@ are separate; do not interpret the example smoke test as hardware certification.
 
 Further guides in the full repository:
 
-- [Operator tour and live checks](https://github.com/NPLAudio/SpatialFabric/blob/main/Docs/SpatialSandboxDemo.md)
-- [Audio patching / CSV / migration](https://github.com/NPLAudio/SpatialFabric/blob/main/Docs/AudioPlayback.md)
-- [OSC reference](https://github.com/NPLAudio/SpatialFabric/blob/main/Docs/OSCReference.md)
-- [Troubleshooting](https://github.com/NPLAudio/SpatialFabric/blob/main/Docs/Troubleshooting.md)
-- [Historical talk/demo deck (2.0.3 archive)](https://github.com/NPLAudio/SpatialFabric/releases/tag/v2.0.3)
+- [Operator tour and live checks](https://github.com/NPLAudio/SpatialFabric-Unreal/blob/main/Docs/SpatialSandboxDemo.md)
+- [Audio patching / CSV / migration](https://github.com/NPLAudio/SpatialFabric-Unreal/blob/main/Docs/AudioPlayback.md)
+- [OSC reference](https://github.com/NPLAudio/SpatialFabric-Unreal/blob/main/Docs/OSCReference.md)
+- [Troubleshooting](https://github.com/NPLAudio/SpatialFabric-Unreal/blob/main/Docs/Troubleshooting.md)
+- [Historical talk/demo deck (2.0.3 archive)](https://github.com/NPLAudio/SpatialFabric-Unreal/releases/tag/v2.0.3)
 
 In a prepared copy, the same operator guides are also under
 `Plugins/SpatialFabric/Docs`. Core code/tools are MIT; Unreal content references
