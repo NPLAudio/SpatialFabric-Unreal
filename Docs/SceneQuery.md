@@ -104,6 +104,7 @@ Header fields:
 | `listener` | explicitly assigned listener actor/transform and owning stage path; automatic player/view-target is described by the stage's resolved pose, not a fabricated actor |
 | `spatial_binding` | manager path/index, label, authored and resolved actor paths/transform, default ID, enabled/mute/gain/width, ADM flags/name/dref/dmax, resolved stage-normalized/meters position when available, per-target ID overrides, adapter configuration and Custom fields |
 | `playback` | component/class/actor identity, registered flag, exact `osc_base` and `controls`, state address, SoundWave path/duration/channel metadata when present, configured device ID/output channel/policy, exclusive/buffer requests, playing/error, loop/BeginPlay/replay settings |
+| `live_input` | component identity, exact `osc_base`, `controls` (`play`, `stop`, `gain`), state address, configured input/output device IDs and channels, gain, requested exclusive/buffer, and **cached** observed live state, peak, buffered latency, xruns and actual device formats. Never enumerates devices or opens a microphone. |
 | `spatial_osc_receiver` | component identity and actual bound IP/port/listening |
 | `spatial_osc_client`, `spatial_registry` | component/class/actor identity; effective adapter destinations are on managers/targets |
 

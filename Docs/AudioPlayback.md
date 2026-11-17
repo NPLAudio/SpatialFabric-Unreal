@@ -21,6 +21,45 @@ blanket hardware certification or Intel Mac validation. See the
 [validation record](../VALIDATION.md#macos-apple-silicon-user-reported-validation).
 Linux direct-device playback is not certified.
 
+## Live input (microphone / line in)
+
+`UAudioLoomLiveInputComponent` (also the placeable **Audio Loom Live Input** actor) routes a **selected
+capture device and channel** to a **selected output device and channel** through the same direct
+WASAPI / Core Audio path as the playback component. It does not use Unreal's AudioComponent graph or
+audio capture components, so it never touches the engine mixer.
+
+Selection mirrors output routing:
+
+| Setting | Behavior |
+|---|---|
+| Input Device / Output Device | Exact OS endpoint IDs. Empty = system default. A configured ID that is missing **fails** (no default fallback). |
+| Input Channel | `0` = all input channels, `1..N` = only that input |
+| Output Channel | `0` = corresponding channels (a single selected input lands on output 1), `1..N` = exactly that output |
+| Exclusive output | Windows output only; if it cannot be granted the start fails rather than silently becoming shared. Capture is always shared. |
+| Buffer / Gain | Output buffer request; linear gain 0..4, always clamped to full scale |
+
+Nothing opens a microphone until an explicit **Start live** (Details panel button with a confirmation,
+the Playback window row, Blueprint `StartLive`, or OSC `/play`). The OS may prompt for permission
+(Windows: Settings > Privacy > Microphone for desktop apps; macOS: the host app needs a microphone usage
+description). Device lists refresh only from the explicit **Refresh devices** button or when the panel
+is built; opening a panel never starts a stream.
+
+**Live means the native worker really started**, not that a start was requested (`IsLive`,
+`OnLiveStateChanged`, OSC `/state`). A bounded ring (about twice the buffer request, 40 ms default) with a
+drift servo absorbs the two devices' independent clocks; underruns, overruns, buffered latency and an input
+peak are reported. That latency is not full round-trip hardware latency. **Routing a microphone to nearby
+speakers causes acoustic feedback: use headphones or a low gain.**
+
+OSC (same listener as playback; base default `/audioloom/<root>/live/<n>`): `<base>/play` (address-only,
+float >=0.5 or int >=1), `<base>/stop`, `<base>/gain` (first float anywhere, else first int; 0..4,
+anything else ignored) and outgoing `<base>/state` (1 = live). Scene discovery reports a read-only
+`live_input` record from cached state and never enumerates devices or opens a microphone.
+
+Tested silently only: bridge mapping/resampling/underrun/overrun/gain, codec round trip, observed-state
+rules, OSC gain semantics and a start against intentionally invalid devices. **No real microphone has
+been opened by any test; physical latency, drift over long runs, channel isolation and feedback behavior
+are unverified, and macOS Core Audio capture has not been compiled.**
+
 ## Patch channels deliberately
 
 | Setting | Actual behavior |

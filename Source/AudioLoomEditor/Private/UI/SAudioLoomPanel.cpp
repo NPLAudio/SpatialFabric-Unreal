@@ -40,6 +40,12 @@
 #include "PropertyCustomizationHelpers.h"
 #include "Sound/SoundWave.h"
 #include "Widgets/Views/STableRow.h"
+#include "AudioLoomLiveInputComponent.h"
+#include "AudioInputDeviceEnumerator.h"
+#include "ScopedTransaction.h"
+#include "Misc/MessageDialog.h"
+#include "Framework/MultiBox/MultiBoxBuilder.h"
+#include "Widgets/Input/SComboButton.h"
 
 #define LOCTEXT_NAMESPACE "SAudioLoomPanel"
 
@@ -305,6 +311,13 @@ void SAudioLoomPanel::Construct(const FArguments& InArgs)
 
 			+ SVerticalBox::Slot()
 			.AutoHeight()
+			.Padding(0.f, 6.f, 0.f, 2.f)
+			[
+				SAssignNew(LiveBox, SVerticalBox)
+			]
+
+			+ SVerticalBox::Slot()
+			.AutoHeight()
 			.Padding(0.f, 4.f)
 			[
 				SNew(STextBlock)
@@ -377,7 +390,133 @@ void SAudioLoomPanel::RebuildComponentList()
 	{
 		ListView->RequestListRefresh();
 	}
+	RebuildLiveRows();
 	UpdateDuplicateLabelWarning();
+}
+
+void SAudioLoomPanel::RebuildLiveRows()
+{
+	LiveList.Reset();
+	if (!LiveBox.IsValid()) return;
+	LiveBox->ClearChildren();
+	UWorld* World = GetCurrentWorld();
+	if (!World) return;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		TArray<UAudioLoomLiveInputComponent*> Lives;
+		It->GetComponents(Lives);
+		for (UAudioLoomLiveInputComponent* Live : Lives) if (IsValid(Live)) LiveList.Add(Live);
+	}
+	if (LiveList.IsEmpty()) return;
+	// Explicit inventory happens here (panel rebuild), never while a stream could be opened.
+	CachedInputDevices = FAudioInputDeviceEnumerator::GetInputDevices();
+	LiveBox->AddSlot().AutoHeight().Padding(0.f, 2.f)
+	[
+		SNew(STextBlock).Text(LOCTEXT("LiveHeader", "Live inputs (microphone / line in → output). Start is always explicit; Live means the worker really started."))
+		.Font(FAppStyle::GetFontStyle("BoldFont"))
+	];
+	for (const TWeakObjectPtr<UAudioLoomLiveInputComponent>& Weak : LiveList)
+	{
+		LiveBox->AddSlot().AutoHeight().Padding(0.f, 2.f)
+		[
+			SNew(SHorizontalBox)
+			+ SHorizontalBox::Slot().FillWidth(1.f).VAlign(VAlign_Center).Padding(0.f, 0.f, 6.f, 0.f)
+			[
+				SNew(STextBlock)
+				.Text_Lambda([Weak]()
+				{
+					const UAudioLoomLiveInputComponent* C = Weak.Get();
+					if (!C) return FText::GetEmpty();
+					const AActor* Owner = C->GetOwner();
+					return FText::FromString(FString::Printf(TEXT("%s  %s  %s  peak %.2f  %.0f ms  xruns %d/%d%s%s"),
+						Owner ? *Owner->GetActorNameOrLabel() : TEXT("?"), *C->GetOscAddress(), C->IsLive() ? TEXT("LIVE") : TEXT("off"),
+						C->GetInputPeak(), C->GetLiveLatencyMs(), C->GetUnderruns(), C->GetOverruns(),
+						C->GetLastLiveError().IsEmpty() ? TEXT("") : TEXT("  ! "), *C->GetLastLiveError()));
+				})
+			]
+			+ SHorizontalBox::Slot().AutoWidth().Padding(2.f, 0.f)
+			[
+				SNew(SComboButton)
+				.ToolTipText(LOCTEXT("LiveInputTip", "Input device (explicit; no fallback for a configured ID)"))
+				.OnGetMenuContent_Lambda([this, Weak]()
+				{
+					FMenuBuilder Menu(true, nullptr);
+					Menu.AddMenuEntry(LOCTEXT("DefaultInput", "Default Input"), FText::GetEmpty(), FSlateIcon(), FUIAction(FExecuteAction::CreateLambda([Weak]()
+					{
+						if (UAudioLoomLiveInputComponent* C = Weak.Get()) { const FScopedTransaction Tx(LOCTEXT("SetLiveInput", "Set live input device")); C->Modify(); C->InputDeviceId.Empty(); }
+					})));
+					for (const FAudioOutputDeviceInfo& D : CachedInputDevices)
+					{
+						const FString Id = D.DeviceId;
+						Menu.AddMenuEntry(FText::FromString(D.FriendlyName), FText::FromString(Id), FSlateIcon(), FUIAction(FExecuteAction::CreateLambda([Weak, Id]()
+						{
+							if (UAudioLoomLiveInputComponent* C = Weak.Get()) { const FScopedTransaction Tx(LOCTEXT("SetLiveInput", "Set live input device")); C->Modify(); C->InputDeviceId = Id; }
+						})));
+					}
+					return Menu.MakeWidget();
+				})
+				.ButtonContent()
+				[
+					SNew(STextBlock).Text_Lambda([this, Weak]()
+					{
+						const UAudioLoomLiveInputComponent* C = Weak.Get();
+						if (!C || C->InputDeviceId.IsEmpty()) return LOCTEXT("InDefault", "In: Default");
+						for (const FAudioOutputDeviceInfo& D : CachedInputDevices) if (D.DeviceId == C->InputDeviceId) return FText::FromString(TEXT("In: ") + D.FriendlyName);
+						return LOCTEXT("InMissing", "In: not in list (kept)");
+					})
+				]
+			]
+			+ SHorizontalBox::Slot().AutoWidth().Padding(2.f, 0.f)
+			[
+				SNew(SComboButton)
+				.ToolTipText(LOCTEXT("LiveOutputTip", "Output device (explicit; no fallback for a configured ID)"))
+				.OnGetMenuContent_Lambda([this, Weak]()
+				{
+					FMenuBuilder Menu(true, nullptr);
+					Menu.AddMenuEntry(LOCTEXT("DefaultOutput", "Default Output"), FText::GetEmpty(), FSlateIcon(), FUIAction(FExecuteAction::CreateLambda([Weak]()
+					{
+						if (UAudioLoomLiveInputComponent* C = Weak.Get()) { const FScopedTransaction Tx(LOCTEXT("SetLiveOutput", "Set live output device")); C->Modify(); C->OutputDeviceId.Empty(); }
+					})));
+					for (const FAudioOutputDeviceInfo& D : CachedDevices)
+					{
+						const FString Id = D.DeviceId;
+						Menu.AddMenuEntry(FText::FromString(D.FriendlyName), FText::FromString(Id), FSlateIcon(), FUIAction(FExecuteAction::CreateLambda([Weak, Id]()
+						{
+							if (UAudioLoomLiveInputComponent* C = Weak.Get()) { const FScopedTransaction Tx(LOCTEXT("SetLiveOutput", "Set live output device")); C->Modify(); C->OutputDeviceId = Id; }
+						})));
+					}
+					return Menu.MakeWidget();
+				})
+				.ButtonContent()
+				[
+					SNew(STextBlock).Text_Lambda([this, Weak]()
+					{
+						const UAudioLoomLiveInputComponent* C = Weak.Get();
+						if (!C || C->OutputDeviceId.IsEmpty()) return LOCTEXT("OutDefault", "Out: Default");
+						for (const FAudioOutputDeviceInfo& D : CachedDevices) if (D.DeviceId == C->OutputDeviceId) return FText::FromString(TEXT("Out: ") + D.FriendlyName);
+						return LOCTEXT("OutMissing", "Out: not in list (kept)");
+					})
+				]
+			]
+			+ SHorizontalBox::Slot().AutoWidth().Padding(2.f, 0.f)
+			[
+				SNew(SButton).Text(LOCTEXT("LiveStart", "Start live"))
+				.OnClicked_Lambda([Weak]()
+				{
+					if (UAudioLoomLiveInputComponent* C = Weak.Get())
+					{
+						if (FMessageDialog::Open(EAppMsgType::YesNo, LOCTEXT("LiveConfirm", "Start live input?\n\nThis opens the selected microphone or line input (the OS may ask permission) and plays it through the selected output. Use headphones or a low gain to avoid feedback.")) == EAppReturnType::Yes) C->StartLive();
+					}
+					return FReply::Handled();
+				})
+			]
+			+ SHorizontalBox::Slot().AutoWidth().Padding(2.f, 0.f)
+			[
+				SNew(SButton).Text(LOCTEXT("LiveStop", "Stop"))
+				.OnClicked_Lambda([Weak]() { if (UAudioLoomLiveInputComponent* C = Weak.Get()) C->StopLive(); return FReply::Handled(); })
+			]
+		];
+	}
 }
 
 void SAudioLoomPanel::UpdateDuplicateLabelWarning()
@@ -466,6 +605,14 @@ bool SAudioLoomPanel::HasComponentListChanged() const
 		}
 	}
 	if (Count != ComponentList.Num()) return true;
+	int32 LiveCount = 0;
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		TArray<UAudioLoomLiveInputComponent*> Lives;
+		It->GetComponents(Lives);
+		for (UAudioLoomLiveInputComponent* Live : Lives) if (IsValid(Live)) ++LiveCount;
+	}
+	if (LiveCount != LiveList.Num()) return true;
 
 	int32 ValidCount = 0;
 	for (const TWeakObjectPtr<UAudioLoomComponent>& W : ComponentList)

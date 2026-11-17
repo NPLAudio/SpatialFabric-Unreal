@@ -19,6 +19,7 @@
 #include "IDetailsView.h"
 #include "PropertyEditorModule.h"
 #include "AudioLoomComponentDetails.h"
+#include "AudioLoomLiveInputDetails.h"
 #include "LevelEditor.h"
 #include "WorkspaceMenuStructure.h"
 #include "WorkspaceMenuStructureModule.h"
@@ -36,6 +37,9 @@ void FAudioLoomEditorModule::StartupModule()
 	PropertyModule.RegisterCustomClassLayout(
 		"AudioLoomComponent",
 		FOnGetDetailCustomizationInstance::CreateStatic(&FAudioLoomComponentDetails::MakeInstance));
+	PropertyModule.RegisterCustomClassLayout(
+		"AudioLoomLiveInputComponent",
+		FOnGetDetailCustomizationInstance::CreateStatic(&FAudioLoomLiveInputDetails::MakeInstance));
 	PropertyModule.NotifyCustomizationModuleChanged(); // refresh any open Details panels picking up the new layout
 
 	ReimportHandle = FEditorDelegates::OnAssetReimport.AddLambda([](UObject* Asset)
@@ -54,6 +58,7 @@ void FAudioLoomEditorModule::ShutdownModule()
 	{
 		FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
 		PropertyModule.UnregisterCustomClassLayout("AudioLoomComponent");
+		PropertyModule.UnregisterCustomClassLayout("AudioLoomLiveInputComponent");
 	}
 
 	if (FGlobalTabmanager::Get()->HasTabSpawner(AudioLoomTabName))

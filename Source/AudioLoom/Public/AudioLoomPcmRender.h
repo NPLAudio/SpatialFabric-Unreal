@@ -19,3 +19,6 @@ private:
 
 /** Exact packed little-endian PCM output; false means unsupported format (writes nothing). */
 AUDIOLOOM_API bool AudioLoomEncodePCM(const float* Source, int32 Samples, uint8* Dest, bool bFloat, int32 Bits, int32 ValidBits);
+
+/** Inverse of AudioLoomEncodePCM: little-endian device words to clamped floats; false means unsupported (writes nothing). */
+AUDIOLOOM_API bool AudioLoomDecodePCM(const uint8* Source, int32 Samples, float* Dest, bool bFloat, int32 Bits, int32 ValidBits);

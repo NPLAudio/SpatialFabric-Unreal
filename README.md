@@ -59,6 +59,9 @@ Unreal build results do not certify the Unity port or vice versa.
   require Epic's FirstPerson character/animation content or any sample download.
 - Optional editor regeneration tools require Python Editor Script Plugin,
   Editor Scripting Utilities and Sequencer Scripting; the example enables them.
+- **Live input (microphone / line in to a chosen output)** is implemented for Windows (WASAPI) and macOS
+  (Core Audio source). Windows is built and silently tested; **macOS live input is uncompiled and untested**.
+  See [Audio playback](Docs/AudioPlayback.md#live-input-microphone--line-in).
 - WASAPI is implemented for Windows; Core Audio is implemented for macOS.
   The Apple Silicon user report is separate from Windows automated results and
   does not certify every Core Audio device, format or lifecycle scenario.

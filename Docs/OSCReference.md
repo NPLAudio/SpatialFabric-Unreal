@@ -109,6 +109,19 @@ argument with `{axis}` following that argument's name. Unsupported/unresolved
 address or argument tokens fail rather than silently generating a different patch.
 See [working recipes](SpatialRouting.md#custom-template-recipes).
 
+## Live input transport
+
+A live-input component answers on its own base (default `/audioloom/<root>/live/<n>`; **Get OSC Address**):
+
+| Suffix | Meaning |
+|---|---|
+| `/play` | Address-only, float >=0.5 or int32 >=1 submits a **start request** (may prompt for microphone access) |
+| `/stop` | Stops the live bridge |
+| `/gain` | First float anywhere, else first int32; finite 0..4 only, anything else is ignored |
+| `/state` | Outgoing float 1/0: the worker really started / is not live. Not a command acknowledgement |
+
+See [Audio playback](AudioPlayback.md#live-input-microphone--line-in) for feedback and permission notes.
+
 ## Playback transport
 
 Resolve the component's effective base with **Get OSC Address**. The example uses:

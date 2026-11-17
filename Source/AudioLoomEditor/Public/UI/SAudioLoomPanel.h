@@ -20,6 +20,8 @@
 #include "Widgets/Views/SListView.h"
 
 class UAudioLoomComponent;
+class UAudioLoomLiveInputComponent;
+class UAudioLoomLiveInputComponent;
 class SAudioLoomExpandableRow;
 class SAudioLoomPanel;
 
@@ -52,6 +54,12 @@ private:
 	FReply OnRefreshClicked();
 	FReply OnExportCsvClicked();
 	FReply OnImportCsvClicked();
+
+	/** Live-input rows (explicit Start/Stop; device pickers). Rebuilt with the playback list. */
+	void RebuildLiveRows();
+	TSharedPtr<class SVerticalBox> LiveBox;
+	TArray<TWeakObjectPtr<UAudioLoomLiveInputComponent>> LiveList;
+	TArray<FAudioOutputDeviceInfo> CachedInputDevices;
 
 	TArray<TWeakObjectPtr<UAudioLoomComponent>> ComponentList;
 	/** `SListView` source: shared pointers so Slate keeps stable row identity. */

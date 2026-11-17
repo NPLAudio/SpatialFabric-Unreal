@@ -9,6 +9,16 @@ python -m unittest discover -s Tools -p "test_*.py"
 Checks descriptor/module integration, migration/distribution files, and the native
 report parser (including failed-test reports accompanied by process exit code zero).
 
+## Live input (silent, Windows)
+
+UE 5.8 Win64: `validate_unreal.py` passed all builds (Editor, Development, Shipping) and **33 native
+tests** (the previous 29 plus 4 live-input tests): bridge mapping/resampling/underrun/overrun/gain/NaN,
+PCM decode round trip, observed-state/OSC-gain/invalid-device behavior (failures declared as expected
+errors) and explicit read-only input inventory. **Not measured:** any real microphone or line input,
+physical latency, long-run drift, feedback handling, the Details/Playback window by interactive
+automation, and macOS Core Audio capture (source written, never compiled). The Apple Silicon report
+below covers playback only and says nothing about live input.
+
 ## macOS Apple Silicon: user-reported validation
 
 The user confirms that the **Unreal SpatialFabric plugin has been tested and works

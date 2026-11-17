@@ -8,6 +8,7 @@
  */
 
 #include "AudioLoomOscSubsystem.h"
+#include "AudioLoomLiveInputComponent.h"
 #include "AudioLoomManagedOSCClient.h"
 #include "AudioLoomComponent.h"
 #include "AudioLoomOscSettings.h"
@@ -83,6 +84,9 @@ void UAudioLoomOscSubsystem::RebuildComponentRegistry()
 	PlayTagToComponents.Empty();
 	StopTagToComponents.Empty();
 	LoopTagToComponents.Empty();
+	LivePlayTags.Empty();
+	LiveStopTags.Empty();
+	LiveGainTags.Empty();
 
 	UWorld* World = GetWorld();
 	if (!World) return;
@@ -106,6 +110,17 @@ void UAudioLoomOscSubsystem::RebuildComponentRegistry()
 			PlayTagToComponents.FindOrAdd(PlayTag).Add(Comp);   // one address → possibly multiple comps if duplicated
 			StopTagToComponents.FindOrAdd(StopTag).Add(Comp);
 			LoopTagToComponents.FindOrAdd(LoopTag).Add(Comp);
+		}
+		TArray<UAudioLoomLiveInputComponent*> LiveComps;
+		It->GetComponents(LiveComps);
+		for (UAudioLoomLiveInputComponent* Live : LiveComps)
+		{
+			if (!IsValid(Live) || !Live->IsRegistered()) continue;
+			const FString LiveBase = NormalizeOscAddress(Live->GetOscAddress());
+			if (LiveBase.IsEmpty()) continue;
+			LivePlayTags.FindOrAdd(LiveBase + TEXT("/play")).Add(Live);
+			LiveStopTags.FindOrAdd(LiveBase + TEXT("/stop")).Add(Live);
+			LiveGainTags.FindOrAdd(LiveBase + TEXT("/gain")).Add(Live);
 		}
 	}
 }
@@ -244,6 +259,26 @@ void UAudioLoomOscSubsystem::HandleOSCMessage(const FOSCMessage& Message, const 
 		}
 	}
 
+	if (TArray<TWeakObjectPtr<UAudioLoomLiveInputComponent>>* LivePlay = LivePlayTags.Find(Normalized))
+	{
+		// Explicit start only; this may trigger an OS microphone permission prompt.
+		if (IsPlayTrigger(Message))
+			for (TWeakObjectPtr<UAudioLoomLiveInputComponent>& W : *LivePlay)
+				if (UAudioLoomLiveInputComponent* C = W.Get()) C->StartLive();
+	}
+	if (TArray<TWeakObjectPtr<UAudioLoomLiveInputComponent>>* LiveStop = LiveStopTags.Find(Normalized))
+		for (TWeakObjectPtr<UAudioLoomLiveInputComponent>& W : *LiveStop)
+			if (UAudioLoomLiveInputComponent* C = W.Get()) C->StopLive();
+	if (TArray<TWeakObjectPtr<UAudioLoomLiveInputComponent>>* LiveGain = LiveGainTags.Find(Normalized))
+	{
+		TArray<int32> GainInts;
+		UOSCManager::GetAllInt32s(Message, GainInts);
+		float NewGain = 0.f;
+		if (UAudioLoomLiveInputComponent::ParseGainArguments(Floats, GainInts, NewGain))
+			for (TWeakObjectPtr<UAudioLoomLiveInputComponent>& W : *LiveGain)
+				if (UAudioLoomLiveInputComponent* C = W.Get()) C->SetGain(NewGain);
+	}
+
 	if (TArray<TWeakObjectPtr<UAudioLoomComponent>>* LoopComps = LoopTagToComponents.Find(Normalized))
 	{
 		const bool bEnableLoop = (TriggerValue > 0.5f); // convention: >0.5 on, else off
@@ -270,6 +305,17 @@ void UAudioLoomOscSubsystem::SendStateUpdate(UAudioLoomComponent* Component, boo
 	Msg.SetAddress(UOSCManager::ConvertStringToOSCAddress(Addr));
 	UOSCManager::AddFloat(Msg, bPlaying ? 1.f : 0.f);
 	OSCClient->SendOSCMessage(Msg); // UDP unicast to SendIP:SendPort
+}
+
+void UAudioLoomOscSubsystem::SendLiveStateUpdate(UAudioLoomLiveInputComponent* Component, bool bLive)
+{
+	if (!OSCClient || !OSCClient->IsActive() || !IsValid(Component)) return;
+	const FString Base = NormalizeOscAddress(Component->GetOscAddress());
+	if (Base.IsEmpty()) return;
+	FOSCMessage Msg;
+	Msg.SetAddress(UOSCManager::ConvertStringToOSCAddress(Base + TEXT("/state")));
+	UOSCManager::AddFloat(Msg, bLive ? 1.f : 0.f); // observed worker lifecycle, never a request acknowledgement
+	OSCClient->SendOSCMessage(Msg);
 }
 
 #undef LOCTEXT_NAMESPACE

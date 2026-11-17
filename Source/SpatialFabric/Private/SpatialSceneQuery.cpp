@@ -9,6 +9,7 @@
 #include "SpatialOSCServerComponent.h"
 #include "SpatialOSCClientComponent.h"
 #include "AudioLoomComponent.h"
+#include "AudioLoomLiveInputComponent.h"
 #include "AudioLoomOscSettings.h"
 #include "AudioLoomOscSubsystem.h"
 #include "Components/BoxComponent.h"
@@ -167,6 +168,23 @@ FString BuildJson(UWorld* World, int32 Offset, int32 Limit)
                 O->SetBoolField(TEXT("loop"),C->GetLoop()); O->SetBoolField(TEXT("play_on_begin_play"),C->bPlayOnBeginPlay); O->SetBoolField(TEXT("auto_replay"),C->bAutoReplay);
                 O->SetBoolField(TEXT("random_replay_delay"),C->bRandomReplayDelay); Number(O,TEXT("replay_delay_seconds"),C->ReplayDelaySeconds);
                 Number(O,TEXT("replay_delay_min"),C->ReplayDelayMin); Number(O,TEXT("replay_delay_max"),C->ReplayDelayMax);
+                Records.Add(O);
+            }
+            else if (auto* Live=Cast<UAudioLoomLiveInputComponent>(Component))
+            {
+                // Cached observed state only: discovery never enumerates devices or opens a microphone.
+                auto O=Record(TEXT("live_input"),Live,Actor); O->SetBoolField(TEXT("registered"),Live->IsRegistered());
+                O->SetStringField(TEXT("osc_base"),Live->GetOscAddress()); auto Controls=Object();
+                for (const FString& Suffix:{FString(TEXT("play")),FString(TEXT("stop")),FString(TEXT("gain"))}) Controls->SetStringField(Suffix,Live->GetOscAddress()+TEXT("/")+Suffix);
+                O->SetObjectField(TEXT("controls"),Controls); O->SetStringField(TEXT("state_address"),Live->GetOscAddress()+TEXT("/state"));
+                O->SetStringField(TEXT("input_device_id"),Live->InputDeviceId); O->SetNumberField(TEXT("input_channel"),Live->InputChannel);
+                O->SetStringField(TEXT("configured_device_id"),Live->OutputDeviceId); O->SetNumberField(TEXT("output_channel"),Live->OutputChannel);
+                Number(O,TEXT("gain"),Live->Gain); O->SetBoolField(TEXT("exclusive_requested"),Live->bUseExclusiveOutput); O->SetNumberField(TEXT("buffer_ms_requested"),Live->BufferSizeMs);
+                O->SetBoolField(TEXT("playing"),Live->IsLive()); O->SetStringField(TEXT("last_error"),Live->GetLastLiveError());
+                Number(O,TEXT("input_peak"),Live->GetInputPeak()); Number(O,TEXT("latency_ms"),Live->GetLiveLatencyMs());
+                O->SetNumberField(TEXT("underruns"),Live->GetUnderruns()); O->SetNumberField(TEXT("overruns"),Live->GetOverruns());
+                O->SetNumberField(TEXT("actual_input_channels"),Live->GetActualInputChannels()); O->SetNumberField(TEXT("actual_input_rate"),Live->GetActualInputRate());
+                O->SetNumberField(TEXT("actual_output_channels"),Live->GetActualOutputChannels()); O->SetNumberField(TEXT("actual_output_rate"),Live->GetActualOutputRate());
                 Records.Add(O);
             }
             else if (auto* Server=Cast<USpatialOSCServerComponent>(Component))

@@ -17,6 +17,7 @@
 #include "AudioLoomOscSubsystem.generated.h"
 
 class UAudioLoomComponent;
+class UAudioLoomLiveInputComponent;
 class UOSCClient;
 struct FOSCMessage;
 
@@ -66,6 +67,9 @@ public:
 	/** Send a play/stop state message for a component. Address format: BaseAddress/state, value 1=playing 0=stopped. */
 	void SendStateUpdate(UAudioLoomComponent* Component, bool bPlaying);
 
+	/** Observed live-input state: BaseAddress/state, 1 = live (worker really started), 0 = not live. */
+	void SendLiveStateUpdate(UAudioLoomLiveInputComponent* Component, bool bLive);
+
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override { RETURN_QUICK_DECLARE_CYCLE_STAT(AudioLoomOSC, STATGROUP_Tickables); }
 	virtual bool IsTickableInEditor() const override { return true; }
@@ -85,6 +89,7 @@ private:
 	TMap<FString, TArray<TWeakObjectPtr<UAudioLoomComponent>>> PlayTagToComponents;
 	TMap<FString, TArray<TWeakObjectPtr<UAudioLoomComponent>>> StopTagToComponents;
 	TMap<FString, TArray<TWeakObjectPtr<UAudioLoomComponent>>> LoopTagToComponents;
+	TMap<FString, TArray<TWeakObjectPtr<UAudioLoomLiveInputComponent>>> LivePlayTags, LiveStopTags, LiveGainTags;
 
 	/** Reserved for future debounced registry rebuilds (currently timer drives refresh from panel). */
 	FTimerHandle RebuildRegistryTimer;
