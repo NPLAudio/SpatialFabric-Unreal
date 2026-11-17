@@ -14,7 +14,7 @@ class DebuggerPanel(ttk.Frame):
         super().__init__(parent, padding=12)
         self.debugger = Debugger(); self.token = None; self.rows = []
         self.listen_ip = tk.StringVar(value='127.0.0.1'); self.listen_port = tk.StringVar(value='9400')
-        self.monitor_port = tk.StringVar(value='9101')
+        self.monitor_port = tk.StringVar(value='9001')
         self.engine_ip = tk.StringVar(value='127.0.0.1'); self.engine_port = tk.StringVar(value='9000'); self.reply_port = tk.StringVar(value='9012')
         self.forward = tk.BooleanVar(value=False); self.only_problems = tk.BooleanVar(value=False)
         self.status = tk.StringVar(value='Stopped. Nothing is bound or sent. Point your sender app at the listen port, then Start.')

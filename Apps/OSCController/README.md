@@ -155,9 +155,10 @@ were not run live for this feature. The checked-in Windows executable was not re
 
 ## Profiles for other engines
 
-`profiles/spatialfabric-godot.json` matches the Godot example (input `9200`, ADM `50029`, state `9201`, cue bases `/godot/...` and a
-live-input cue). Engines use different default ports on purpose; load the matching profile or the controller will listen on the
-wrong ports and show nothing. The Unity example ships its own profile under `ExampleProject/OSCControllerProfile.json`.
+Unreal, Unity and Godot all default to the same ports (spatial listener `8100`, playback control `9000`, state `9001`, ADM `50018`,
+Custom example `9002`), so the controller's default profile talks to any of them. The engine profiles differ only in **cue bases**:
+`profiles/spatialfabric-godot.json` (`/godot/...` plus a live-input cue) and, for Unity, `ExampleProject/OSCControllerProfile.json`
+(`/unity/...`). Only one engine app can own the input ports at a time; start a second and it reports a bind error.
 
 ## Spatial / renderer
 

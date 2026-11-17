@@ -51,7 +51,7 @@ class RealEngine(unittest.TestCase):
 
     def setUp(self):
         self.debugger = Debugger(); self.listen_port = free_port()
-        self.debugger.start(('127.0.0.1', self.listen_port), monitor=('127.0.0.1', 9201), query=('127.0.0.1', 9200), forward=('127.0.0.1', 9200))
+        self.debugger.start(('127.0.0.1', self.listen_port), monitor=('127.0.0.1', 9001), query=('127.0.0.1', 9000), forward=('127.0.0.1', 9000))
         self.sender = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     def tearDown(self): self.debugger.stop(); self.sender.close()

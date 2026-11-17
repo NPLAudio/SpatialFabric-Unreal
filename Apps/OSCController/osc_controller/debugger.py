@@ -361,7 +361,7 @@ def main(argv=None):
     p = argparse.ArgumentParser(description='Verify what a sender app emits against the OSC contract and a running engine.')
     p.add_argument('--listen', default='127.0.0.1:9400', help='where your sender app should send (default 127.0.0.1:9400)')
     p.add_argument('--engine-query', help='engine scene-query input ip:port (read-only) to load its real cues/IDs, e.g. 127.0.0.1:9000')
-    p.add_argument('--monitor', help='ip:port to receive the engine /state replies, e.g. 127.0.0.1:9101')
+    p.add_argument('--monitor', help='ip:port to receive the engine /state replies, e.g. 127.0.0.1:9001')
     p.add_argument('--forward', help='ip:port of the engine input to FORWARD to (may start playback/microphone there). Off by default.')
     p.add_argument('--duration', type=float, default=30.0); p.add_argument('--report'); p.add_argument('--fail-on', choices=('warn', 'error'), default='error')
     args = p.parse_args(argv)

@@ -99,7 +99,7 @@ class EngineSimulator:
 def main(argv=None):
     import argparse
     p = argparse.ArgumentParser(description='Simulated engine for testing sender apps. Produces no sound and opens no device.')
-    p.add_argument('--listen', default='127.0.0.1:9000'); p.add_argument('--monitor', default='127.0.0.1:9101')
+    p.add_argument('--listen', default='127.0.0.1:9000'); p.add_argument('--monitor', default='127.0.0.1:9001')
     p.add_argument('--cue', action='append', default=[], help='playback cue base (repeatable)'); p.add_argument('--live', action='append', default=[], help='live-input cue base (repeatable)')
     p.add_argument('--fail-start', action='append', default=[], help='BASE: that cue refuses to start (simulates an invalid device)')
     args = p.parse_args(argv)
