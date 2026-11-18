@@ -14,7 +14,8 @@ Download OSC Controller 1.4.0 from the [hub 1.0.0 release](https://github.com/NP
 2. **[Spatial routing](SpatialRouting.md)** — stage sizing, object identity,
    coordinate conversion, ADM/Custom, metadata and listener following.
 3. **[Direct audio](AudioPlayback.md)** — channel patching, devices, preparation,
-   loops/replay, CSV, cooked media and migration.
+   loops/replay, CSV, cooked media and migration. See also
+   [AudioLoom playback compatibility and fresh software checks](PlaybackParity.md).
 4. **[OSC reference](OSCReference.md)** — exact addresses, types, ports, config
    files, network permissions and an executable sender example.
 5. **[Showcase tour](SpatialSandboxDemo.md)** — prepared example, ten-minute

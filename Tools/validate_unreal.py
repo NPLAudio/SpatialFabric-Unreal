@@ -18,6 +18,7 @@ REQUIRED_TESTS = {
     "SpatialFabricAudit.Listener.AttachedChildDrift",
     "SpatialFabricAudit.Editor.FrameWithoutBeginPlay",
     "SpatialFabric.Playback.WavValidation",
+    "SpatialFabric.Playback.LegacySidecarAndBudget",
     "SpatialFabric.Playback.RateRoutingAndEOF",
     "SpatialFabric.Playback.TransportReplayCancellation",
     "SpatialFabric.OSC.TypedPlayTriggers",

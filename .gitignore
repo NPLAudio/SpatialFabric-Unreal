@@ -35,6 +35,7 @@ Thumbs.db
 Docs/*
 !Docs/CODEBASE_GUIDE.md
 !Docs/AudioPlayback.md
+!Docs/PlaybackParity.md
 !Docs/SpatialSandboxDemo.md
 !Docs/README.md
 !Docs/GettingStarted.md

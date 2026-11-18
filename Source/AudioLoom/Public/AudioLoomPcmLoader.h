@@ -5,7 +5,8 @@
  * @brief WAV parse + `USoundWave` extraction → **interleaved float** PCM for the backend.
  *
  * Editor builds use imported PCM. Cooked non-streaming (Force Inline) assets use Unreal's
- * registered codec factory. Streaming and unsupported channel orderings fail explicitly.
+ * registered codec factory, with bounded legacy sibling-WAV fallback when enabled.
+ * Streaming and unsupported channel orderings require a WAV sidecar or inline recook.
  */
 
 #pragma once
@@ -31,6 +32,16 @@ struct AUDIOLOOM_API FAudioLoomPcmResult
 class AUDIOLOOM_API FAudioLoomPcmLoader
 {
 public:
+	/** Configured decoded PCM ceiling, clamped to safe TArray/index limits. */
+	static int64 GetMaxDecodedBytes();
+	/** Overflow-safe allocation policy shared by imported, cooked and WAV decoding. */
+	static bool IsDecodedSizeAllowed(int64 SampleCount);
+	/**
+	 * Resolve only .wav/.WAV beside an existing package filename (never scans directories).
+	 * Public for migration tooling and deterministic tests; does not load or open audio devices.
+	 */
+	static FAudioLoomPcmResult LoadLegacySidecar(const FString& PackageFilename);
+
 	/**
 	 * Load PCM from a WAV file path.
 	 * Bounded RIFF parser for PCM16/24/32 and IEEE float32; validates whole frames.
@@ -41,6 +52,7 @@ public:
 	/**
 	 * Load PCM from a USoundWave asset.
 	 * Imported PCM in editor, or native decoded/inline cooked data at runtime.
+	 * If unavailable, tries a bounded package-sibling WAV when compatibility is enabled.
 	 */
 	static FAudioLoomPcmResult LoadFromSoundWave(USoundWave* SoundWave);
 };

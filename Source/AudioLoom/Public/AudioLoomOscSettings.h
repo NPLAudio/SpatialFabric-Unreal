@@ -44,5 +44,15 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category = "OSC")
 	int32 SendPort = 9001;
 
+	/** Per-source decoded float PCM budget. Raise deliberately for long installation cues.
+	 * The default remains 256 MiB; array/index limits are enforced even when increased. */
+	UPROPERTY(Config, EditAnywhere, Category = "Playback", meta = (ClampMin = "1", ClampMax = "8191", UIMin = "1", UIMax = "8191"))
+	int32 MaxDecodedAudioMiB = 256;
+
+	/** Compatibility with standalone SoundWave deployments containing a sibling .wav/.WAV.
+	 * Files are only looked up beside the resolved package; they must be staged separately. */
+	UPROPERTY(Config, EditAnywhere, Category = "Playback")
+	bool bAllowLegacyWavSidecar = true;
+
 	virtual FName GetCategoryName() const override;
 };

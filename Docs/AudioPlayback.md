@@ -110,8 +110,13 @@ Editor imports are decoded from the SoundWave's imported data. WAV parsing suppo
 little-endian PCM16/24/32 and float32, including validated extensible full-width
 formats, chunk padding, complete interleaved frames, finite samples, 8–384 kHz and
 1–64 channels. Unsupported encodings such as arbitrary float64 are not silently
-reinterpreted. Decoded float PCM is capped at **256 MiB per component**; this is an
-in-memory cue player, not unlimited long-form streaming.
+reinterpreted. Decoded float PCM defaults to **256 MiB per component**. For long
+installation cues, Project Settings → Spatial Fabric Playback OSC → Playback →
+`MaxDecodedAudioMiB` can explicitly raise the budget (1–8191 MiB, clamped even for
+hand-edited config). Integer indexing and file-array limits still apply; allocation
+may fail before that ceiling depending on available memory. This is an in-memory
+cue player, not unlimited long-form streaming. Raising the budget increases peak
+preparation memory and must be qualified on the target machine.
 
 PCM is interpolated at the actual output-device rate to preserve duration/pitch
 across source/device-rate differences. Windows writes negotiated float32 or
@@ -127,8 +132,13 @@ acceptance and Intel Mac testing remain separate gates.
 3. Confirm the chosen cooked codec has a decoder registered in that build.
 4. Run the actual packaged project and verify duration, channel order and error handling.
 
-Streaming chunks are rejected instead of blocking/spinning while waiting for IO.
-The plugin does not silently search for a sibling source WAV in a packaged build.
+Streaming chunks are not passed to a full-file decoder or synchronously fetched.
+For standalone AudioLoom compatibility, when imported/raw/inline decoding is not
+available, `bAllowLegacyWavSidecar` (default true) permits bounded `.wav`/`.WAV`
+loading beside the resolved package filename. It does not search arbitrary paths,
+start playback, or bypass WAV validation/the configured PCM budget. Stage these
+external files explicitly; a cooked SoundWave alone does not package the sidecar.
+Disable that setting if the deployment must rely exclusively on embedded assets.
 Multichannel Vorbis ordering is explicitly rejected rather than assigning channels
 incorrectly. A supported device-order codec such as PCM/ADPCM is preferable for
 that use, subject to your real codec/package test. Compilation of Shipping code
@@ -206,7 +216,8 @@ patch sheet and asset/version inventory.
 3. Remove stale generated binaries/intermediates only as appropriate, regenerate
    project files and rebuild against the chosen engine. Do not delete source media.
 4. Inspect default receive IP, packaged permissions, explicit device routes,
-   cooked Loading Behavior, resolved OSC paths and physical channel assignments.
+   cooked Loading Behavior, legacy sidecar staging, PCM memory budget, resolved OSC
+   paths and physical channel assignments.
 
 Retained: `AudioLoom`/`AudioLoomEditor` module names, `/Script/AudioLoom` classes,
 Engine config section, CSV columns, legacy hidden `AudioLoomPanel` tab. No class
