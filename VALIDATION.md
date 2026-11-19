@@ -1,5 +1,26 @@
 # Validation and release gates
 
+## Current scene manager and audio routing (2026-11-18)
+
+UE **5.8 Win64**: BuildPlugin **Editor Development, Game Development and Game
+Shipping passed**; **44 native tests passed** (43 clean, one existing expected
+raw-SoundWave warning), zero failed/not-run/in-process. Python tooling: **33 passed**.
+Evidence: `C:/Temp/SFUnrealRouting-final-clipping/Report/index.json`, `build.log`
+and `tests.log`. All 106 source/header/build-rule files matched the tested copy.
+
+Includes [Scene Objects](Docs/SceneObjectManager.md) inventory/attachment/mixed
+native properties and the default [Audio Routing](Docs/AudioRoutingMatrix.md)
+crosspoint grid, selectors, explicit metadata refresh, offline cache, exact endpoint
+identity, guarded Undo, real per-user Slate capture/release, clipped input and wheel
+boundaries. Restoring component properties via Undo stops legacy playback and
+cancels replay/start state rather than restarting on a restored endpoint.
+
+Disposable `-NoSound -NullRHI` projects only: no physical audio, capture or hotplug.
+Native-window visual/DPI/scrollbar, full map save/reopen, protected-instance and
+platform/hardware acceptance remain manual. This source validation does not rebuild
+older release archives or supersede the previously documented cooked `-NoSound`
+loader limitations. Earlier sections below retain their original measurements.
+
 ## Cue acknowledgement/status feedback (2026-11-17)
 
 UE 5.8 Win64 Editor build passed, followed by **35 native tests**, zero failed/skipped/in-progress, in an isolated `-NoSound`/NullRHI project. Includes shared acknowledgement fixtures (34 decisions, seven golden packets), observed start/failure/stop/status lifecycle, nested unknown-suffix rejection and live teardown restart protection. The validation gate now requires both acknowledgement tests. Evidence: `C:/Users/davo_/AppData/Local/Temp/SpatialFabricAckFinalGate/`. Validated Editor binaries were copied into this plugin's local `Binaries/` directory. Development/Shipping, hardware playback/capture and other platforms were not revalidated in this pass.

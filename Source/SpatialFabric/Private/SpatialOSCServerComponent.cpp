@@ -34,9 +34,30 @@ void USpatialOSCServerComponent::EndPlay(const EEndPlayReason::Type EndPlayReaso
 
 void USpatialOSCServerComponent::OnUnregister()
 {
-	StopListening(); // Editor deletion/map reload must not wait for UObject garbage collection.
+	// Property/Undo reconstruction is not an explicit transport Stop. Real deletion,
+	// map reload and all other unregisters still release the socket immediately.
+#if WITH_EDITOR
+	if (!bPreserveListeningOnEditorReregister)
+#endif
+		StopListening();
 	Super::OnUnregister();
 }
+
+#if WITH_EDITOR
+void USpatialOSCServerComponent::PreEditUndo()
+{
+	// Component transactions may run before the owning manager's PreEditChange.
+	TGuardValue<bool> PreserveListener(bPreserveListeningOnEditorReregister, true);
+	Super::PreEditUndo();
+}
+
+void USpatialOSCServerComponent::PostEditUndo()
+{
+	Super::PostEditUndo();
+	// Undo that actually deletes the component/owner must still release the listener.
+	if (!IsValid(this) || !IsValid(GetOwner())) StopListening();
+}
+#endif
 
 void USpatialOSCServerComponent::BeginDestroy()
 {
@@ -46,6 +67,9 @@ void USpatialOSCServerComponent::BeginDestroy()
 
 void USpatialOSCServerComponent::StartListening(const FString& IP, int32 Port)
 {
+#if WITH_DEV_AUTOMATION_TESTS
+	if (TestStart) { TestStart(IP, Port); return; }
+#endif
 	StopListening();
 
 	Receiver = MakeShared<FSpatialFabricOSCReceiver>();
@@ -65,6 +89,9 @@ void USpatialOSCServerComponent::StartListening(const FString& IP, int32 Port)
 
 void USpatialOSCServerComponent::StopListening()
 {
+#if WITH_DEV_AUTOMATION_TESTS
+	if (TestStop) { TestStop(); return; }
+#endif
 	if (Receiver) Receiver->Stop();
 	Receiver.Reset();
 	CurrentPort = 0;
@@ -73,6 +100,9 @@ void USpatialOSCServerComponent::StopListening()
 
 bool USpatialOSCServerComponent::IsListening() const
 {
+#if WITH_DEV_AUTOMATION_TESTS
+	if (TestIsListening) return TestIsListening();
+#endif
 	return Receiver && Receiver->IsListening();
 }
 

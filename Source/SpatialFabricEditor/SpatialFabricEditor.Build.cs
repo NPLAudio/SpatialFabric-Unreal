@@ -20,8 +20,10 @@ public class SpatialFabricEditor : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[]
 		{
 			"AudioLoom",
+			"Json",
 			"AudioLoomEditor", // embedded playback/device-routing panel
 			"EditorSubsystem",
+			"SubobjectDataInterface",
 			"PropertyEditor",
 			"Slate",
 			"SlateCore",

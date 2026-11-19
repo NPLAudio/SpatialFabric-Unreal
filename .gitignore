@@ -42,6 +42,8 @@ Docs/*
 !Docs/SpatialRouting.md
 !Docs/OSCReference.md
 !Docs/SceneQuery.md
+!Docs/SceneObjectManager.md
+!Docs/AudioRoutingMatrix.md
 !Docs/Troubleshooting.md
 !Docs/Development.md
 

@@ -23,7 +23,7 @@ public:
 	 * Get all active audio rendering (output) devices.
 	 * Call from game thread; may block briefly for COM enumeration.
 	 */
-	static TArray<FAudioOutputDeviceInfo> GetOutputDevices();
+	static TArray<FAudioOutputDeviceInfo> GetOutputDevices(FString* OutError = nullptr);
 
 	/**
 	 * Get device info by ID. Returns bIsValid=false if not found.

@@ -26,10 +26,12 @@ build is not interchangeable just because its filename matches.
 ## The panel is the main operating surface
 
 Open **Window → Spatial Fabric**. If docked too small, enlarge the panel or move
-its tab to a larger stack; controls are scrollable. The five tabs are:
+its tab to a larger stack; controls are scrollable. The seven tabs are:
 
 | Tab | Use it for |
 |---|---|
+| Audio Routing (default) | Configure cue × interface/channel crosspoints or selectors with offline history |
+| Scene Objects | Browse all placed actors, explicitly add capabilities and edit shared SpatialFabric properties |
 | Stage | Assign a measurement box; choose fixed or listener-relative coordinates |
 | Objects | Patch actors to positive spatial IDs and protocol targets |
 | Radar | Check relative movement and aspect/axis expectations |
@@ -38,7 +40,10 @@ its tab to a larger stack; controls are scrollable. The five tabs are:
 
 A missing Manager is a setup condition, not a reason to silently add actors.
 Explicitly use the spawn action when requested. Direct playback does not require
-a Manager or stage at all.
+a Manager or stage at all. Neither Scene Objects nor Audio Routing requires a
+manager. In Audio Routing, **Refresh Interfaces** is explicit; cached unplugged
+layouts survive, and green checks mean authored configuration, not live signal.
+See [Scene Objects](SceneObjectManager.md) and [routing grid safety](AudioRoutingMatrix.md).
 
 ## First spatial output: prove the control patch
 

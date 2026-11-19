@@ -12,7 +12,7 @@ Blueprints, Engine configuration and existing C++ consumers:
 | Module | Host | Responsibility |
 |---|---|---|
 | SpatialFabric | Runtime | Stage, registry, bindings, protocol router, ADM/Custom, spatial OSC |
-| SpatialFabricEditor | Editor | Five-tab Spatial Fabric panel and editor/PIE network ownership |
+| SpatialFabricEditor | Editor | Seven-tab Spatial Fabric panel: spatial controls, Scene Objects authoring, offline-first Audio Routing crosspoints/selectors and editor/PIE network ownership |
 | AudioLoom | Runtime | SoundWave decode/cache, PCM cursor/encoding, device backend, playback OSC |
 | AudioLoomEditor | Editor | Playback widgets/details, CSV, transactional edits and reimport handling |
 

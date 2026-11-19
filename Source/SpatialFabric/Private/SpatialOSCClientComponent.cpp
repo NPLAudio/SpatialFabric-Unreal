@@ -33,6 +33,9 @@ void USpatialOSCClientComponent::EndPlay(const EEndPlayReason::Type EndPlayReaso
 
 void USpatialOSCClientComponent::Connect(const FString& IP, int32 Port)
 {
+#if WITH_DEV_AUTOMATION_TESTS
+	if (TestConnect) { TestConnect(IP, Port); return; }
+#endif
 	if (Port < 1 || Port > 65535 || IP.IsEmpty()) { Disconnect(); return; }
 	if (OSCClient && OSCClient->IsActive())
 	{
@@ -66,6 +69,9 @@ void USpatialOSCClientComponent::Connect(const FString& IP, int32 Port)
 
 void USpatialOSCClientComponent::Disconnect()
 {
+#if WITH_DEV_AUTOMATION_TESTS
+	if (TestDisconnect) { TestDisconnect(); return; }
+#endif
 	if (OSCClient)
 	{
 		// UOSCClient is GC'd when no strong refs remain
@@ -79,6 +85,9 @@ void USpatialOSCClientComponent::Disconnect()
 
 bool USpatialOSCClientComponent::IsConnected() const
 {
+#if WITH_DEV_AUTOMATION_TESTS
+	if (TestIsConnected) return TestIsConnected();
+#endif
 	return OSCClient != nullptr && OSCClient->IsActive();
 }
 

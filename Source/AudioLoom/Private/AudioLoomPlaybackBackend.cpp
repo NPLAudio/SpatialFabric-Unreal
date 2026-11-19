@@ -215,7 +215,7 @@ bool FAudioLoomPlaybackBackendImpl::RunPlatform()
             if (AudioObjectGetPropertyData(ID, &UIDAddress, 0, nullptr, &UIDSize, &UID) == noErr && UID)
             {
                 char Text[4096];
-                if (CFStringGetCString(UID, Text, sizeof(Text), kCFStringEncodingUTF8) && DeviceId == UTF8_TO_TCHAR(Text)) Device = ID;
+                if (CFStringGetCString(UID, Text, sizeof(Text), kCFStringEncodingUTF8) && DeviceId.Equals(UTF8_TO_TCHAR(Text), ESearchCase::CaseSensitive)) Device = ID;
                 CFRelease(UID);
             }
         }

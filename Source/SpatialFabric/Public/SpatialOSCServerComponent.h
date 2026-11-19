@@ -63,8 +63,23 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void OnUnregister() override;
 	virtual void BeginDestroy() override;
+#if WITH_EDITOR
+	virtual void PreEditUndo() override;
+	virtual void PostEditUndo() override;
+#endif
 
 private:
+#if WITH_EDITOR
+	friend class ASpatialFabricManagerActor;
+	// Native property/Undo callbacks temporarily unregister components, not a transport Stop.
+	bool bPreserveListeningOnEditorReregister = false;
+#endif
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FSceneObjectsInitializedCallbacks;
+	TFunction<void(const FString&, int32)> TestStart;
+	TFunction<void()> TestStop;
+	TFunction<bool()> TestIsListening;
+#endif
 	TSharedPtr<class FSpatialFabricOSCReceiver> Receiver;
 
 	/** IP address the server is bound to. */

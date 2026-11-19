@@ -89,6 +89,13 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FSceneObjectsInitializedCallbacks;
+	// Per-instance fake transport: intercept before any socket allocation in automation.
+	TFunction<void(const FString&, int32)> TestConnect;
+	TFunction<void()> TestDisconnect;
+	TFunction<bool()> TestIsConnected;
+#endif
 	/** Underlying UE OSC client object. Null when disconnected. */
 	UPROPERTY()
 	UOSCClient* OSCClient;

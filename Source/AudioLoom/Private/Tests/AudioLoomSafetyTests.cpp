@@ -123,9 +123,16 @@ bool FSFTransportState::RunTest(const FString&)
     Component->bAutoReplay = true; Component->ReplayDelaySeconds = 0;
     Component->HandlePlaybackEvent({false, true});
     TestTrue(TEXT("Zero delay still schedules natural replay"), Component->bReplayPending);
+    TestFalse(TEXT("Route edits reject pending replay without starting a stream"), Component->IsRouteEditStopped());
     TestEqual(TEXT("Zero delay is preserved"), Component->ReplayCountdown, 0.f);
     Component->Stop();
     TestFalse(TEXT("Explicit Stop cancels pending replay"), Component->bReplayPending);
+    TestTrue(TEXT("Stopped component permits route preflight"), Component->IsRouteEditStopped());
+    Component->bStartPending = true;
+    TestFalse(TEXT("Async initialization blocks route edits"), Component->IsRouteEditStopped());
+    Component->bStartPending = false; Component->bWasPlaying = true;
+    TestFalse(TEXT("Undrained playback state blocks route edits"), Component->IsRouteEditStopped());
+    Component->bWasPlaying = false;
     Component->HandlePlaybackEvent({false, false});
     TestFalse(TEXT("Failure/cancellation is not natural completion"), Component->bReplayPending);
     Component->SetLoop(true);
@@ -136,6 +143,29 @@ bool FSFTransportState::RunTest(const FString&)
     Component->HandlePlaybackEvent({false, true});
     TestTrue(TEXT("Random delay is bounded"), Component->ReplayCountdown >= 0.2f && Component->ReplayCountdown <= 0.4f);
     Component->Stop();
+#if WITH_EDITOR
+    // TickComponent requires a registered component; use a disposable editor
+    // world, never the user's editor world or a live audio device.
+    UWorld* UndoWorld = UWorld::CreateWorld(EWorldType::Editor, false);
+    Component->RegisterComponentWithWorld(UndoWorld);
+    Component->bLoop = false;
+    Component->bAutoReplay = true;
+    Component->ReplayDelaySeconds = 0;
+    Component->HandlePlaybackEvent({false, true});
+    Component->bStartPending = true;
+    Component->bWasPlaying = true;
+    Component->DeviceId = TEXT("Restored endpoint from Undo");
+    Component->PostEditUndo();
+    TestTrue(TEXT("Undo cancels replay/async/undrained state before property callbacks"), Component->IsRouteEditStopped());
+    TestFalse(TEXT("Undo disables playback/replay tick"), Component->IsComponentTickEnabled());
+    if (!Component->IsRegistered()) Component->RegisterComponentWithWorld(UndoWorld);
+    Component->TickComponent(1.f, LEVELTICK_All, nullptr);
+    TestTrue(TEXT("Subsequent tick cannot start the restored route"), Component->IsRouteEditStopped());
+    TestFalse(TEXT("Undo and next tick never prepare PCM"), Component->PreparedPCM.IsValid());
+    TestTrue(TEXT("Undo retains authored restored endpoint"), Component->DeviceId.Equals(TEXT("Restored endpoint from Undo"), ESearchCase::CaseSensitive));
+    Component->UnregisterComponent();
+    UndoWorld->DestroyWorld(false);
+#endif
     return true;
 }
 #endif

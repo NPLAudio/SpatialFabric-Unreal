@@ -134,6 +134,10 @@ void UAudioLoomComponent::Stop()
     SetComponentTickEnabled(false);
 }
 bool UAudioLoomComponent::IsPlaying() const { return AudioBackend && AudioBackend->IsPlaying(); }
+bool UAudioLoomComponent::IsRouteEditStopped() const
+{
+    return !IsPlaying() && !bStartPending && !bWasPlaying && !bReplayPending && !bStopping;
+}
 float UAudioLoomComponent::GetOutputLatencyMs() const { return AudioBackend ? AudioBackend->GetOutputLatencyMs() : 0; }
 FString UAudioLoomComponent::GetLastPlaybackError() const { return !DecodeError.IsEmpty() ? DecodeError : (AudioBackend ? AudioBackend->GetLastError() : TEXT("Backend destroyed")); }
 void UAudioLoomComponent::SetLoop(bool Value)
@@ -150,7 +154,7 @@ void UAudioLoomComponent::ApplyPlaybackSettings()
 {
     if (AudioBackend) AudioBackend->SetLoop(bLoop);
     if (!bAutoReplay || !SoundWave || bLoop) bReplayPending = false;
-    if (IsPlaying() && (StartedWave.Get() != SoundWave || StartedDevice != DeviceId || StartedChannel != OutputChannel
+    if (IsPlaying() && (StartedWave.Get() != SoundWave || !StartedDevice.Equals(DeviceId, ESearchCase::CaseSensitive) || StartedChannel != OutputChannel
         || StartedBuffer != BufferSizeMs || bStartedExclusive != bUseExclusiveMode))
     { if (SoundWave) Play(); else Stop(); }
 }
@@ -163,8 +167,12 @@ void UAudioLoomComponent::PostEditChangeProperty(FPropertyChangedEvent& Event)
 }
 void UAudioLoomComponent::PostEditUndo()
 {
+    // Super dispatches PostEditChange: stop first so restoring a route can never
+    // restart on a different endpoint, including on the next tick/replay event.
+    // A subsequent explicit Play is required after Undo/Redo during playback.
+    Stop();
     Super::PostEditUndo();
-    InvalidatePcmCache(); ApplyPlaybackSettings(); RefreshOscRegistry();
+    InvalidatePcmCache(); RefreshOscRegistry();
 }
 #endif
 AActor* UAudioLoomComponent::GetOscHierarchyRootForActor(AActor* Start)

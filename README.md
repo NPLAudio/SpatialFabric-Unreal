@@ -8,7 +8,7 @@
 
 SpatialFabric combines ADM-OSC/Custom OSC spatial positioning with AudioLoom
 OS-device/channel playback in one plugin. Open **Window → Spatial Fabric** for
-Stage, Objects, Radar, Output and Playback.
+Audio Routing (default), Stage, Objects, Radar, Output, Scene Objects and Playback.
 
 > **Two independent signal paths:** spatial output sends control data, not audio.
 > Direct playback sends PCM to an OS output device, not automatically to an ADM
@@ -43,6 +43,8 @@ repositories; Unreal build results do not certify those integrations or vice ver
 | Try a ready-made level | [Example setup](Examples/SpatialFabricShowcase/README.md) |
 | Add the plugin to a show/project | [Getting started](Docs/GettingStarted.md) |
 | Send positions to an external renderer | [Spatial routing](Docs/SpatialRouting.md) |
+| Configure cue output crosspoints/offline interfaces | [Audio Routing grid](Docs/AudioRoutingMatrix.md) |
+| Manage all placed objects' SpatialFabric properties | [Scene Objects manager](Docs/SceneObjectManager.md) |
 | Play cues to a device/channel | [Audio playback and CSV](Docs/AudioPlayback.md) |
 | Query scene configuration as JSON/OSC | [Scene query command and examples](Docs/SceneQuery.md) |
 | Use a standalone OSC desktop controller | [Shared OSC Controller app](https://github.com/NPLAudio/SpatialFabric/tree/main/Apps/OSCController) |
@@ -136,10 +138,16 @@ standalone copy is recommended when moving or distributing the example.
 5. Read **Output**, then verify actual incoming UDP in your receiver. A preview
    or successful UDP send is not an acknowledgement from an audio processor.
 
-The five-tab workflow, coordinate conventions, per-target IDs, metadata, listener
+The spatial-control workflow, coordinate conventions, per-target IDs, metadata, listener
 following and Custom templates are covered in [Spatial routing](Docs/SpatialRouting.md).
 
 ## First direct-audio patch
+
+For silent central configuration, open **Audio Routing**, explicitly **Refresh
+Interfaces**, then use cue-row × interface/channel crosspoints or the selectors.
+Cached unplugged interfaces remain available; checks mean configured, not live.
+No manager is required. See [routing/Undo safety](Docs/AudioRoutingMatrix.md).
+Use **Scene Objects** to explicitly attach playback to ordinary placed actors.
 
 1. Add an **Audio Loom** actor/component and assign a supported SoundWave.
 2. Choose the intended OS output device. Empty device ID means default output;

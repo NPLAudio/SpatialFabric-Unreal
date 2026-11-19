@@ -27,6 +27,12 @@ Download OSC Controller 1.4.0 from the [hub 1.0.0 release](https://github.com/NP
 8. **[Codebase guide](CODEBASE_GUIDE.md)** — four modules, runtime data flow,
    threading/lifetime, source reading order and extension points.
 
+**[Audio Routing crosspoint grid](AudioRoutingMatrix.md)** — default editor tab,
+offline interfaces, exact channels, Refresh Interfaces and guarded Undo.
+
+**[Scene Objects manager](SceneObjectManager.md)** — editor-world inventory and
+safe authoring without a manager actor.
+
 **[Scene query / discovery](SceneQuery.md)** — read-only JSON/OSC inventory,
 pagination and parsing, plus Python, Node.js, Max and Node-RED examples.
 

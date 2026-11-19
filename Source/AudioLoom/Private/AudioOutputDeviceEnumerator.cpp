@@ -148,9 +148,11 @@ static void ReadPlaybackFormat(IMMDevice* Device, FAudioOutputDeviceInfo& Info)
 #pragma comment(lib, "ole32.lib")
 #endif
 
-TArray<FAudioOutputDeviceInfo> FAudioOutputDeviceEnumerator::GetOutputDevices()
+TArray<FAudioOutputDeviceInfo> FAudioOutputDeviceEnumerator::GetOutputDevices(FString* OutError)
 {
 	TArray<FAudioOutputDeviceInfo> Result;
+	if (OutError) OutError->Reset();
+	auto Fail = [OutError]() { if (OutError) *OutError = TEXT("Output inventory incomplete or unavailable; cached history preserved."); };
 
 #if PLATFORM_WINDOWS
 	// Windows audio stack is COM-based; enumerator lists all active render endpoints
@@ -166,13 +168,13 @@ TArray<FAudioOutputDeviceInfo> FAudioOutputDeviceEnumerator::GetOutputDevices()
 
 	if (FAILED(hr) || !pEnumerator)
 	{
-		return Result;
+		Fail(); return Result;
 	}
 
 	hr = pEnumerator->EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE, &pDevices);
 	if (FAILED(hr) || !pDevices)
 	{
-		pEnumerator->Release();
+		Fail(); pEnumerator->Release();
 		return Result;
 	}
 
@@ -180,7 +182,7 @@ TArray<FAudioOutputDeviceInfo> FAudioOutputDeviceEnumerator::GetOutputDevices()
 	hr = pDevices->GetCount(&Count);
 	if (FAILED(hr))
 	{
-		pDevices->Release();
+		Fail(); pDevices->Release();
 		pEnumerator->Release();
 		return Result;
 	}
@@ -193,14 +195,14 @@ TArray<FAudioOutputDeviceInfo> FAudioOutputDeviceEnumerator::GetOutputDevices()
 		hr = pDevices->Item(i, &pDevice);
 		if (FAILED(hr) || !pDevice)
 		{
-			continue;
+			Fail(); continue;
 		}
 
 		LPWSTR pwszId = nullptr;
 		hr = pDevice->GetId(&pwszId);
 		if (FAILED(hr) || !pwszId)
 		{
-			pDevice->Release();
+			Fail(); pDevice->Release();
 			continue;
 		}
 
@@ -246,6 +248,10 @@ TArray<FAudioOutputDeviceInfo> FAudioOutputDeviceEnumerator::GetOutputDevices()
 			int32 ProbeChannels = FormatChannels;
 			Info.NumChannels = FMath::Max(FormatChannels, ProbeChannels);
 		}
+
+		// A partial inventory must not replace a cached friendly name with empty
+		// metadata even if later mix-format discovery succeeds.
+		if (Info.FriendlyName.IsEmpty()) Fail();
 
 		// Property blob missing? Fall back to mix format (what the shared-mode engine uses)
 		if (!Info.bIsValid)
@@ -294,13 +300,14 @@ TArray<FAudioOutputDeviceInfo> FAudioOutputDeviceEnumerator::GetOutputDevices()
 	};
 	UInt32 DataSize = 0;
 	OSStatus Err = AudioObjectGetPropertyDataSize(kAudioObjectSystemObject, &Addr, 0, nullptr, &DataSize);
-	if (Err != noErr || DataSize == 0) return Result;
+	if (Err != noErr) { Fail(); return Result; }
+	if (DataSize == 0) return Result;
 
 	const UInt32 NumDevices = DataSize / sizeof(AudioDeviceID);
 	TArray<AudioDeviceID> DeviceIDs;
 	DeviceIDs.SetNum(NumDevices);
 	Err = AudioObjectGetPropertyData(kAudioObjectSystemObject, &Addr, 0, nullptr, &DataSize, DeviceIDs.GetData());
-	if (Err != noErr) return Result;
+	if (Err != noErr) { Fail(); return Result; }
 
 	for (UInt32 i = 0; i < NumDevices; ++i)
 	{
@@ -310,12 +317,13 @@ TArray<FAudioOutputDeviceInfo> FAudioOutputDeviceEnumerator::GetOutputDevices()
 		Addr.mScope = kAudioDevicePropertyScopeOutput;
 		UInt32 StreamSize = 0;
 		Err = AudioObjectGetPropertyDataSize(DevID, &Addr, 0, nullptr, &StreamSize);
-		if (Err != noErr || StreamSize == 0) continue;
+		if (Err != noErr) { Fail(); continue; }
+		if (StreamSize == 0) continue;
 
 		TArray<uint8> Buf;
 		Buf.SetNum(StreamSize);
 		Err = AudioObjectGetPropertyData(DevID, &Addr, 0, nullptr, &StreamSize, Buf.GetData());
-		if (Err != noErr) continue;
+		if (Err != noErr) { Fail(); continue; }
 
 		AudioBufferList* pList = (AudioBufferList*)Buf.GetData();
 		UInt32 OutChannels = 0;
@@ -349,6 +357,7 @@ TArray<FAudioOutputDeviceInfo> FAudioOutputDeviceEnumerator::GetOutputDevices()
 		}
 		if (Info.DeviceId.IsEmpty())
 		{
+			Fail(); // transient numeric IDs must not enter the persistent editor cache
 			Info.DeviceId = FString::Printf(TEXT("%u"), static_cast<unsigned>(DevID));
 		}
 
@@ -370,11 +379,14 @@ TArray<FAudioOutputDeviceInfo> FAudioOutputDeviceEnumerator::GetOutputDevices()
 		}
 		if (Info.FriendlyName.IsEmpty())
 		{
+			Fail(); // legacy callers may display the ID; the routing cache rejects it
 			Info.FriendlyName = Info.DeviceId;
 		}
 		Info.bIsValid = true;
 		Result.Add(Info);
 	}
+#else
+	Fail();
 #endif
 
 	return Result;
@@ -389,7 +401,7 @@ FAudioOutputDeviceInfo FAudioOutputDeviceEnumerator::GetDeviceById(const FString
 	TArray<FAudioOutputDeviceInfo> Devices = GetOutputDevices(); // linear scan — list is usually small
 	for (const FAudioOutputDeviceInfo& D : Devices)
 	{
-		if (D.DeviceId == DeviceId)
+		if (D.DeviceId.Equals(DeviceId, ESearchCase::CaseSensitive))
 		{
 			return D;
 		}

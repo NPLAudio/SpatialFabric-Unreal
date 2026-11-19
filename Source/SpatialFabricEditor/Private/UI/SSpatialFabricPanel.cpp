@@ -40,6 +40,8 @@ struct FScopedSpatialEdit
 #include "Widgets/Layout/SExpandableArea.h"
 #include "Widgets/Layout/SScrollBox.h"
 #include "Widgets/Layout/SWidgetSwitcher.h"
+#include "UI/SSceneObjectsPanel.h"
+#include "UI/SAudioRoutingPanel.h"
 #include "Widgets/Layout/SWrapBox.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Input/SButton.h"
@@ -341,16 +343,20 @@ void SSpatialFabricPanel::Construct(const FArguments& InArgs)
 	RegisterActiveTimer(0.25f,
 		FWidgetActiveTimerDelegate::CreateSP(this, &SSpatialFabricPanel::OnRefreshTimer));
 
+	// Legacy transport UI is created only when explicitly opened (it inventories hardware).
+	TSharedRef<SBox> PlaybackHost = SNew(SBox);
 	// Build the content switcher first so tab buttons can reference it
-	TSharedRef<SWidgetSwitcher> Switcher = SAssignNew(TabSwitcher, SWidgetSwitcher)
+	TSharedRef<SWidgetSwitcher> Switcher = SAssignNew(TabSwitcher, SWidgetSwitcher).WidgetIndex(6)
 		+ SWidgetSwitcher::Slot()[ BuildStageTab()   ]   // 0
 		+ SWidgetSwitcher::Slot()[ BuildObjectsTab() ]   // 1
 		+ SWidgetSwitcher::Slot()[ BuildRadarTab()   ]   // 2
 		+ SWidgetSwitcher::Slot()[ BuildOutputTab()  ]   // 3
-		+ SWidgetSwitcher::Slot()[ SNew(SAudioLoomPanel) ]; // 4: direct audio playback
+		+ SWidgetSwitcher::Slot()[ PlaybackHost ] // 4: legacy transport, lazy
+		+ SWidgetSwitcher::Slot()[ SNew(SSceneObjectsPanel) ] // 5: editor authoring, no manager required
+		+ SWidgetSwitcher::Slot()[ SNew(SAudioRoutingPanel) ]; // 6: default offline crosspoints
 
 	// ── Tab button row ──────────────────────────────────────────────────────
-	auto MakeTabBtn = [this](FText Label, int32 Idx) -> TSharedRef<SWidget>
+	auto MakeTabBtn = [this, PlaybackHost](FText Label, int32 Idx) -> TSharedRef<SWidget>
 	{
 		return SNew(SBox).MinDesiredWidth(80.f)
 		[
@@ -362,8 +368,10 @@ void SSpatialFabricPanel::Construct(const FArguments& InArgs)
 					? FLinearColor(0.15f, 0.45f, 0.80f)
 					: FLinearColor(0.12f, 0.12f, 0.12f);
 			})
-			.OnClicked_Lambda([this, Idx]() -> FReply
+			.OnClicked_Lambda([this, Idx, PlaybackHost]() -> FReply
 			{
+				if (Idx == 4 && PlaybackHost->GetChildren()->Num() == 1 && PlaybackHost->GetChildren()->GetChildAt(0) == SNullWidget::NullWidget)
+					PlaybackHost->SetContent(SNew(SAudioLoomPanel));
 				TabSwitcher->SetActiveWidgetIndex(Idx);
 				return FReply::Handled();
 			})
@@ -408,7 +416,7 @@ void SSpatialFabricPanel::Construct(const FArguments& InArgs)
 				.Visibility_Lambda([this]()
 				{
 					// Direct playback does not require a spatial manager actor.
-					return GetManager() || TabSwitcher->GetActiveWidgetIndex() == 4
+					return GetManager() || TabSwitcher->GetActiveWidgetIndex() >= 4
 						? EVisibility::Collapsed : EVisibility::Visible;
 				})
 				.BorderImage(FAppStyle::GetBrush("ToolPanel.GroupBorder"))
@@ -455,6 +463,10 @@ void SSpatialFabricPanel::Construct(const FArguments& InArgs)
 				[ MakeTabBtn(LOCTEXT("TabOutput", "Output"), 3) ]
 				+ SHorizontalBox::Slot().AutoWidth().Padding(0.f, 0.f, 2.f, 0.f)
 				[ MakeTabBtn(LOCTEXT("TabPlayback", "Playback"), 4) ]
+				+ SHorizontalBox::Slot().AutoWidth()
+				[ MakeTabBtn(LOCTEXT("TabSceneObjects", "Scene Objects"), 5) ]
+				+ SHorizontalBox::Slot().AutoWidth().Padding(2.f)
+				[ MakeTabBtn(LOCTEXT("TabAudioRouting", "Audio Routing"), 6) ]
 				+ SHorizontalBox::Slot().FillWidth(1.f) // spacer
 			]
 

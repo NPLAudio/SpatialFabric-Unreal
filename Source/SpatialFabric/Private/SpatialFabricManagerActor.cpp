@@ -198,6 +198,11 @@ ASpatialFabricManagerActor* ASpatialFabricManagerActor::GetOrSpawnManager(
 
 void ASpatialFabricManagerActor::InitializeAdapters()
 {
+	InitializeAdapters(true);
+}
+
+void ASpatialFabricManagerActor::InitializeAdapters(bool bConnectClient)
+{
 	if (!Router) { return; }
 	Router->ClearAdapters();
 
@@ -221,8 +226,8 @@ void ASpatialFabricManagerActor::InitializeAdapters()
 	RegisterOSC(MakeShared<FADMOSCAdapter>(),     ESpatialAdapterType::ADMOSC);
 	RegisterOSC(MakeShared<FCustomAdapter>(),     ESpatialAdapterType::Custom);
 
-	// Connect the shared OSC client to the first OSC adapter (user can override)
-	ConnectClient();
+	// Editor authoring callbacks only synchronize configuration, never transport state.
+	if (bConnectClient) ConnectClient();
 }
 
 void ASpatialFabricManagerActor::PopulateDefaultAdapterConfigs()
@@ -400,15 +405,27 @@ void ASpatialFabricManagerActor::BeginDestroy()
 }
 
 #if WITH_EDITOR
+void ASpatialFabricManagerActor::PreEditChange(FProperty* PropertyAboutToChange)
+{
+	// AActor unregisters components here (also reached by PreEditUndo). Keep the
+	// existing listener alive until the paired Post callback finishes reconstruction.
+	if (ServerComponent) ServerComponent->bPreserveListeningOnEditorReregister = true;
+	Super::PreEditChange(PropertyAboutToChange);
+}
+
 void ASpatialFabricManagerActor::PostEditUndo()
 {
+	if (ServerComponent) ServerComponent->bPreserveListeningOnEditorReregister = true;
 	Super::PostEditUndo();
-	if (Router) InitializeAdapters();
+	if (Router) InitializeAdapters(false);
+	if (ServerComponent) ServerComponent->bPreserveListeningOnEditorReregister = false;
 }
 
 void ASpatialFabricManagerActor::PostEditChangeProperty(FPropertyChangedEvent& Event)
 {
+	if (ServerComponent) ServerComponent->bPreserveListeningOnEditorReregister = true;
 	Super::PostEditChangeProperty(Event);
-	if (Router) InitializeAdapters();
+	if (Router) InitializeAdapters(false);
+	if (ServerComponent) ServerComponent->bPreserveListeningOnEditorReregister = false;
 }
 #endif

@@ -31,6 +31,14 @@ REQUIRED_TESTS = {
     "SpatialFabric.OSC.BoundedDatagramDecoder",
     "SpatialFabric.OSC.ComponentUnregisterClosesSocket",
     "SpatialFabric.CSV.ValidationMultilineAndUndo",
+    "SpatialFabric.SceneObjects.LoadedOrdinaryAndRestrictions",
+    "SpatialFabric.SceneObjects.BulkAddUndoRedoAndValues",
+    "SpatialFabric.SceneObjects.BindingPreservesExistingAndUndo",
+    "SpatialFabric.SceneObjects.InitializedCallbacksPreserveTransport",
+    "SpatialFabric.SceneObjects.StatusIndexCountsAndIdentity",
+    "SpatialFabric.AudioRouting.CacheValidationOfflineAndRefresh",
+    "SpatialFabric.AudioRouting.CrosspointMappingAndVisibleGeometry",
+    "SpatialFabric.AudioRouting.OfflineRoutesUndoAndGuards",
 }
 
 

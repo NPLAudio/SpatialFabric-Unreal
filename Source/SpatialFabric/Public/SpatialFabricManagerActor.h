@@ -210,11 +210,18 @@ protected:
 	virtual void Tick(float DeltaTime) override;
 	virtual void BeginDestroy() override;
 #if WITH_EDITOR
+	virtual void PreEditChange(FProperty* PropertyAboutToChange) override;
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& Event) override;
 	virtual void PostEditUndo() override;
 #endif
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FSceneObjectsInitializedCallbacks;
+#endif
+	/** Configuration-only for editor callbacks; explicit public reinitialization still connects. */
+	void InitializeAdapters(bool bConnectClient);
+
 	static constexpr int32 MaxLogEntries = 500;
 
 	/** Protocol router — plain C++ object, not a UPROPERTY. */
